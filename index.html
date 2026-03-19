@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="UTF-8">
+    <title>Untitled</title>
+    
+
+  </head>
+    
+  <body>
+  <!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>John TicTacToe</title>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg: #ffffff; --txt: #333; --main: #5865F2; --cont: #ffffff;
+            --brd: #ddd; --danger: #ff4757; --success: #43b581; --hover: #f1f1f1;
+        }
+        .dark-mode {
+            --bg: #1a1a1a; --txt: #f1f1f1; --cont: #2d2d2d;
+            --brd: #444; --hover: #3d3d3d;
+        }
+
+        html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: var(--bg); color: var(--txt);
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; transition: 0.3s;
+        }
+
+        .view {
+            animation: fadeIn 0.4s;
+            width: 90%; max-width: 420px; background: var(--cont);
+            border: 1px solid var(--brd); border-radius: 20px; padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center; position: relative;
+            display: flex; flex-direction: column; box-sizing: border-box;
+            max-height: 90vh; margin: auto;
+        }
+        .view-large { height: 88vh; padding: 20px; }
+        .scroll-area { flex: 1; overflow-y: auto; }
+
+        @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+        button {
+            padding: 12px; border: none; border-radius: 12px;
+            background: var(--main); color: white; font-weight: bold;
+            cursor: pointer; transition: 0.2s; flex-shrink: 0; font-size: 0.95rem;
+        }
+        button:hover { opacity: 0.9; transform: scale(1.02); }
+        button:disabled { opacity: 0.6; transform: none; cursor: not-allowed; background: #999; }
+        button.secondary { background: var(--hover); color: var(--txt); }
+        button.danger { background: var(--danger); color: white; }
+        button.green-btn { background: var(--success); color: white; }
+
+        input, select {
+            width: 100%; padding: 12px; margin: 8px 0;
+            border: 1px solid transparent; border-radius: 12px;
+            background: var(--hover); color: var(--txt);
+            box-sizing: border-box; font-family: inherit; transition: 0.2s;
+        }
+        input:focus, select:focus { outline: none; border-color: var(--main); background: var(--cont); }
+
+        .hidden { display: none !important; }
+
+        #systemEmbed {
+            position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
+            min-width: 250px; color: white; padding: 12px 25px; border-radius: 50px;
+            font-weight: bold; box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            z-index: 10000; transition: top 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-align: center;
+        }
+        #systemEmbed.show { top: 20px; }
+
+        #globalLoading {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 9999; gap: 12px;
+        }
+        .loader-icon { font-size: 3rem; color: var(--main); animation: pulse 1.2s infinite; }
+        @keyframes pulse { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(1.15); opacity:0.7; } }
+
+        .menu-btn {
+            display: flex; align-items: center; gap: 15px;
+            padding: 18px 20px; border-radius: 16px;
+            background: var(--hover); color: var(--txt);
+            border: 2px solid var(--brd); margin-bottom: 12px;
+            font-size: 1rem; text-align: left; width: 100%; transition: 0.2s;
+        }
+        .menu-btn:hover { border-color: var(--main); background: rgba(88,101,242,0.07); transform: scale(1.01); }
+        .menu-btn .menu-icon {
+            font-size: 1.8rem; width: 45px; height: 45px; border-radius: 12px;
+            background: rgba(88,101,242,0.12); display: flex; align-items: center;
+            justify-content: center; flex-shrink: 0;
+        }
+        .menu-btn .menu-text { flex: 1; }
+        .menu-btn .menu-title { font-weight: bold; font-size: 1.05rem; display: block; }
+        .menu-btn .menu-sub { font-size: 0.8rem; color: #888; display: block; margin-top: 2px; }
+
+        #gameView { overflow: visible; }
+        .board-area { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 10px 0; }
+        .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; width: 280px; max-width: 100%; }
+        .cell {
+            width: 100%; aspect-ratio: 1;
+            background: var(--hover); border: 2px solid var(--brd);
+            border-radius: 14px; font-size: 2.5rem; font-weight: bold;
+            cursor: pointer; transition: 0.15s;
+            display: flex; align-items: center; justify-content: center; user-select: none;
+        }
+        .cell:hover:not(.filled):not(.disabled) { border-color: var(--main); background: rgba(88,101,242,0.1); }
+        .cell.filled, .cell.disabled { cursor: default; }
+        .cell.x { color: var(--main); }
+        .cell.o { color: var(--danger); }
+        .cell.win-cell { background: rgba(88,101,242,0.2); border-color: var(--main); }
+        .cell.win-cell.o { background: rgba(255,71,87,0.15); border-color: var(--danger); }
+
+        .score-bar {
+            display: flex; justify-content: space-around; align-items: center;
+            background: var(--hover); border-radius: 14px; padding: 12px 20px;
+            margin: 8px 0; gap: 10px;
+        }
+        .score-player { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+        .score-player .score-name {
+            font-size: 0.8rem; color: #888; font-weight: 600;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100px;
+        }
+        .score-player .score-num { font-size: 1.8rem; font-weight: bold; line-height: 1; }
+        .score-player.x .score-num { color: var(--main); }
+        .score-player.o .score-num { color: var(--danger); }
+        .score-divider { font-size: 1.2rem; color: #ccc; }
+        .round-badge {
+            font-size: 0.75rem; color: #888; text-align: center;
+            padding: 4px 10px; background: var(--cont); border-radius: 50px; border: 1px solid var(--brd);
+        }
+
+        .turn-indicator {
+            font-size: 0.9rem; font-weight: 600; padding: 8px 16px;
+            border-radius: 50px; margin: 5px 0; transition: 0.3s;
+        }
+        .turn-indicator.my-turn {
+            background: rgba(88,101,242,0.12); color: var(--main);
+            border: 2px solid rgba(88,101,242,0.3); animation: glow 1.5s infinite;
+        }
+        .turn-indicator.not-my-turn { background: var(--hover); color: #888; border: 2px solid var(--brd); }
+        @keyframes glow {
+            0%,100% { box-shadow: 0 0 0 0 rgba(88,101,242,0.3); }
+            50% { box-shadow: 0 0 0 6px rgba(88,101,242,0); }
+        }
+
+        .friend-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px; border-bottom: 1px solid var(--brd);
+            border-radius: 12px; margin-bottom: 5px; transition: 0.2s;
+        }
+        .friend-item:hover { background: var(--hover); }
+        .friend-online-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-right: 8px; }
+        .dot-online { background: var(--success); }
+        .dot-offline { background: #aaa; }
+
+        .diff-btn {
+            padding: 18px 20px; border-radius: 16px; margin-bottom: 10px;
+            width: 100%; text-align: left; display: flex; align-items: center; gap: 15px;
+            border: 2px solid var(--brd); background: var(--hover); color: var(--txt); transition: 0.2s;
+        }
+        .diff-btn:hover { border-color: var(--main); transform: scale(1.01); }
+        .diff-btn .diff-icon { font-size: 1.6rem; }
+        .diff-btn .diff-title { font-weight: bold; display: block; }
+        .diff-btn .diff-desc { font-size: 0.8rem; color: #888; display: block; margin-top: 2px; }
+
+        .search-anim { display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 30px 0; }
+        .search-spinner {
+            width: 70px; height: 70px; border-radius: 50%;
+            border: 5px solid var(--brd); border-top-color: var(--main);
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .invite-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center; z-index: 5000;
+        }
+        .invite-card {
+            background: var(--cont); padding: 28px; border-radius: 20px;
+            max-width: 340px; width: 90%; text-align: center;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3); border: 2px solid var(--main);
+            animation: fadeIn 0.3s;
+        }
+
+        .result-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+            border-radius: 20px; display: flex; justify-content: center; align-items: center;
+            z-index: 100; animation: fadeIn 0.3s;
+        }
+        .result-card {
+            background: var(--cont); padding: 28px; border-radius: 20px;
+            text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 2px solid var(--main); width: 85%;
+        }
+        .result-emoji { font-size: 3.5rem; margin-bottom: 8px; }
+        .result-title { font-size: 1.4rem; font-weight: bold; margin: 0 0 6px 0; }
+
+        .match-won-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+            display: flex; justify-content: center; align-items: center; z-index: 9000;
+            animation: fadeIn 0.4s;
+        }
+        .match-won-card {
+            background: var(--cont); padding: 35px; border-radius: 24px;
+            text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+            border: 3px solid var(--main); max-width: 340px; width: 90%;
+            animation: popIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+        }
+        @keyframes popIn { from { transform:scale(0.8); opacity:0; } to { transform:scale(1); opacity:1; } }
+
+        .game-header {
+            display: flex; align-items: center; gap: 10px;
+            padding-bottom: 10px; border-bottom: 1px solid var(--brd); margin-bottom: 8px; flex-shrink: 0;
+        }
+        .game-header h3 { margin: 0; flex: 1; font-size: 1rem; text-align: center; }
+
+        .agb-row { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; margin: 12px 0; }
+        .agb-row input { width: 18px; height: 18px; margin: 0; cursor: pointer; }
+
+        .info-box {
+            background: rgba(88,101,242,0.07); border: 1px solid rgba(88,101,242,0.2);
+            border-radius: 12px; padding: 10px 14px; font-size: 0.82rem;
+            color: #666; margin: 8px 0; text-align: left;
+        }
+        .dark-mode .info-box { color: #aaa; }
+        .empty-state { color: #888; font-size: 0.9rem; padding: 30px 0; text-align: center; }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); backdrop-filter: blur(5px);
+            display: flex; justify-content: center; align-items: center; z-index: 1000;
+        }
+        .modal-card {
+            background: var(--cont); width: 90%; max-width: 380px;
+            padding: 25px; border-radius: 20px; box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+            border: 1px solid var(--brd); text-align: center;
+        }
+
+        #forgotPasswordEmbed {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--cont); border-radius: 20px; padding: 25px;
+            box-sizing: border-box; z-index: 100; display: flex; flex-direction: column; justify-content: center;
+        }
+        #registerRedirectEmbed {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+            display: flex; justify-content: center; align-items: center; z-index: 8000;
+        }
+    </style>
+</head>
+<body>
+
+<div id="systemEmbed"></div>
+
+<div id="globalLoading" class="hidden">
+    <div class="loader-icon"><i class="fas fa-gamepad"></i></div>
+    <h2 style="margin:0;">John TicTacToe</h2>
+    <p style="margin:5px 0; color:#888;">Wird geladen...</p>
+</div>
+
+<!-- HOME -->
+<div id="homeView" class="view">
+    <div style="font-size:3rem; margin-bottom:5px;">🎮</div>
+    <h1 style="margin:0 0 5px 0;">John TicTacToe</h1>
+    <p style="color:#888; font-size:0.9rem; margin:0 0 20px 0;">Spielen mit Freunden &amp; KI</p>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+        <button onclick="showView('loginView')"><i class="fas fa-sign-in-alt"></i> Anmelden</button>
+        <button onclick="showRegisterRedirect()" class="secondary">Registrieren</button>
+    </div>
+</div>
+
+<!-- BANNED -->
+<div id="bannedView" class="view hidden">
+    <div style="font-size:3rem;">🚫</div>
+    <h2>GESPERRT</h2>
+    <p id="banMessage">Dein Account wurde permanent gesperrt.</p>
+    <p id="banReasonDisplay" style="background:rgba(0,0,0,0.1); padding:10px; border-radius:8px; font-weight:bold;"></p>
+    <button onclick="executeLogout()" style="background:var(--danger); margin-top:20px;">Abmelden</button>
+</div>
+
+<!-- LOGIN -->
+<div id="loginView" class="view hidden">
+    <h1 style="margin:0 0 5px 0;"><i class="fas fa-gamepad" style="color:var(--main);"></i> Login</h1>
+    <p style="color:#888; font-size:0.85rem; margin:0 0 15px 0;">Melde dich mit deinem John Chat Konto an</p>
+    <input type="text" id="loginUser" placeholder="Benutzername">
+    <input type="password" id="loginPass" placeholder="Passwort">
+    <div class="agb-row" style="justify-content:flex-start;">
+        <input type="checkbox" id="keepLogin">
+        <span style="font-size:0.85rem;">Angemeldet bleiben</span>
+    </div>
+    <button onclick="login()" style="width:100%;">Einloggen</button>
+    <button onclick="showView('homeView')" class="secondary" style="width:100%; margin-top:8px;">Zurück</button>
+</div>
+
+<!-- MENU -->
+<div id="menuView" class="view hidden">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;">
+        <span id="menuGreeting" style="font-weight:bold; font-size:1rem;"></span>
+        <button onclick="confirmLogout()" class="secondary" style="padding:7px 12px; font-size:0.8rem;">Abmelden</button>
+    </div>
+    <h2 style="margin:0 0 18px 0; text-align:center;"><span style="color:var(--main);">Tic Tac</span> Toe</h2>
+    <button class="menu-btn" onclick="showView('aiSelectView')">
+        <div class="menu-icon">🤖</div>
+        <div class="menu-text"><span class="menu-title">Solo Spiel</span><span class="menu-sub">Spiele gegen eine KI</span></div>
+        <i class="fas fa-chevron-right" style="color:#ccc;"></i>
+    </button>
+    <button class="menu-btn" onclick="openFriendsGame()">
+        <div class="menu-icon">👥</div>
+        <div class="menu-text"><span class="menu-title">Freundes Spiel</span><span class="menu-sub">Fordere Freunde heraus</span></div>
+        <i class="fas fa-chevron-right" style="color:#ccc;"></i>
+    </button>
+    <button class="menu-btn" onclick="startMatchmaking()">
+        <div class="menu-icon">🔍</div>
+        <div class="menu-text"><span class="menu-title">Spielsuche</span><span class="menu-sub">Zufälligen Gegner finden</span></div>
+        <i class="fas fa-chevron-right" style="color:#ccc;"></i>
+    </button>
+</div>
+
+<!-- AI SELECT -->
+<div id="aiSelectView" class="view hidden">
+    <div class="game-header">
+        <button onclick="showView('menuView')" class="secondary" style="padding:7px 12px;"><i class="fas fa-chevron-left"></i></button>
+        <h3>KI Stärke wählen</h3>
+        <div style="width:46px;"></div>
+    </div>
+    <button class="diff-btn" onclick="startAiGame('leicht')">
+        <span class="diff-icon">😊</span>
+        <div><span class="diff-title">Leicht</span><span class="diff-desc">KI macht zufällige Züge — perfekt für Einsteiger</span></div>
+    </button>
+    <button class="diff-btn" onclick="startAiGame('mittel')">
+        <span class="diff-icon">🧠</span>
+        <div><span class="diff-title">Mittel</span><span class="diff-desc">KI blockt &amp; greift gelegentlich klug an</span></div>
+    </button>
+    <button class="diff-btn" onclick="startAiGame('schwer')">
+        <span class="diff-icon">💀</span>
+        <div><span class="diff-title">Schwer</span><span class="diff-desc">Unbesiegbare KI mit Minimax-Algorithmus</span></div>
+    </button>
+</div>
+
+<!-- FRIENDS GAME -->
+<div id="friendsView" class="view view-large hidden">
+    <div class="game-header">
+        <button onclick="showView('menuView')" class="secondary" style="padding:7px 12px;"><i class="fas fa-chevron-left"></i></button>
+        <h3>Freundes Spiel</h3>
+        <button onclick="loadFriendsList()" class="secondary" style="padding:7px 12px;" title="Aktualisieren"><i class="fas fa-sync-alt"></i></button>
+    </div>
+    <div class="info-box"><i class="fas fa-info-circle" style="color:var(--main);"></i> Der eingeladene Freund muss ebenfalls <b>John TicTacToe</b> geöffnet haben, um die Einladung zu empfangen.</div>
+    <div class="scroll-area" id="friendsGameList" style="margin-top:8px;">
+        <div class="empty-state"><i class="fas fa-spinner fa-spin"></i><br>Freunde werden geladen...</div>
+    </div>
+</div>
+
+<!-- MATCHMAKING -->
+<div id="matchmakingView" class="view hidden">
+    <div class="game-header">
+        <button onclick="cancelMatchmaking()" class="secondary" style="padding:7px 12px;"><i class="fas fa-chevron-left"></i></button>
+        <h3>Spielsuche</h3>
+        <div style="width:46px;"></div>
+    </div>
+    <div class="search-anim">
+        <div class="search-spinner"></div>
+        <div>
+            <p style="font-weight:bold; font-size:1.1rem; margin:0;">Suche nach Gegner...</p>
+            <p style="color:#888; font-size:0.85rem; margin:5px 0 0 0;">Du wirst automatisch verbunden, sobald ein Spieler gefunden wird.</p>
+        </div>
+        <div id="queueCount" style="font-size:0.8rem; color:#aaa;"></div>
+    </div>
+    <button onclick="cancelMatchmaking()" class="danger" style="margin-top:auto;">Abbrechen</button>
+</div>
+
+<!-- GAME -->
+<div id="gameView" class="view view-large hidden">
+    <div class="game-header">
+        <button onclick="confirmLeaveGame()" class="secondary" style="padding:7px 12px;"><i class="fas fa-sign-out-alt"></i></button>
+        <h3 id="gameTitle">Tic Tac Toe</h3>
+        <div style="width:46px;"></div>
+    </div>
+    <div class="score-bar">
+        <div class="score-player x">
+            <span class="score-name" id="scoreNameX">X</span>
+            <span class="score-num" id="scoreX">0</span>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+            <div class="score-divider">:</div>
+            <div class="round-badge" id="roundBadge">Runde 1/3</div>
+        </div>
+        <div class="score-player o">
+            <span class="score-name" id="scoreNameO">O</span>
+            <span class="score-num" id="scoreO">0</span>
+        </div>
+    </div>
+    <div class="turn-indicator" id="turnIndicator">Am Zug...</div>
+    <div class="board-area">
+        <div class="board" id="gameBoard">
+            <div class="cell" onclick="handleCellClick(0)" id="cell-0"></div>
+            <div class="cell" onclick="handleCellClick(1)" id="cell-1"></div>
+            <div class="cell" onclick="handleCellClick(2)" id="cell-2"></div>
+            <div class="cell" onclick="handleCellClick(3)" id="cell-3"></div>
+            <div class="cell" onclick="handleCellClick(4)" id="cell-4"></div>
+            <div class="cell" onclick="handleCellClick(5)" id="cell-5"></div>
+            <div class="cell" onclick="handleCellClick(6)" id="cell-6"></div>
+            <div class="cell" onclick="handleCellClick(7)" id="cell-7"></div>
+            <div class="cell" onclick="handleCellClick(8)" id="cell-8"></div>
+        </div>
+    </div>
+    <div class="result-overlay hidden" id="roundResultOverlay">
+        <div class="result-card">
+            <div class="result-emoji" id="roundResultEmoji"></div>
+            <p class="result-title" id="roundResultTitle"></p>
+            <p style="color:#888; font-size:0.85rem; margin:0 0 15px 0;" id="roundResultSub"></p>
+            <button id="nextRoundBtn" style="width:100%;">Nächste Runde</button>
+        </div>
+    </div>
+</div>
+
+<!-- MATCH WON -->
+<div class="match-won-overlay hidden" id="matchWonOverlay">
+    <div class="match-won-card">
+        <div style="font-size:4rem;" id="matchWonEmoji"></div>
+        <h2 style="color:var(--main); margin:10px 0 5px 0;" id="matchWonTitle"></h2>
+        <p style="color:#888; margin:0 0 20px 0; font-size:0.9rem;" id="matchWonSub"></p>
+        <div class="score-bar" style="margin-bottom:20px;">
+            <div class="score-player x"><span class="score-name" id="mwNameX">X</span><span class="score-num" id="mwScoreX">0</span></div>
+            <div class="score-divider">:</div>
+            <div class="score-player o"><span class="score-name" id="mwNameO">O</span><span class="score-num" id="mwScoreO">0</span></div>
+        </div>
+        <button onclick="backToMenu()" style="width:100%;">Zum Menü</button>
+    </div>
+</div>
+
+<!-- INVITE -->
+<div class="invite-overlay hidden" id="inviteOverlay">
+    <div class="invite-card">
+        <div style="font-size:2.5rem; margin-bottom:10px;">🎮</div>
+        <h2 style="color:var(--main); margin:0 0 8px 0;">Spieleinladung!</h2>
+        <p><b id="inviteFromName"></b> fordert dich zum Tic Tac Toe heraus!</p>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:15px;">
+            <button onclick="acceptInvite()" class="green-btn"><i class="fas fa-check"></i> Annehmen</button>
+            <button onclick="declineInvite()" class="danger"><i class="fas fa-times"></i> Ablehnen</button>
+        </div>
+    </div>
+</div>
+
+<!-- REGISTER REDIRECT -->
+<div id="registerRedirectEmbed" class="hidden">
+    <div class="invite-card">
+        <div style="font-size:2.5rem; margin-bottom:10px;">💬</div>
+        <h2 style="color:var(--main); margin:0 0 10px 0;">Kein Account?</h2>
+        <p style="color:#666; font-size:0.9rem; margin:0 0 15px 0;">Erstelle dir ein Konto auf <b>John Chat</b>, um John TicTacToe zu spielen.</p>
+        <button onclick="window.open('https://johnchat.app', '_blank')" style="width:100%; margin-bottom:8px;"><i class="fas fa-external-link-alt"></i> Erstelle dir ein Account auf John Chat</button>
+        <button onclick="document.getElementById('registerRedirectEmbed').classList.add('hidden')" class="secondary" style="width:100%;">Zurück</button>
+    </div>
+</div>
+
+<!-- INVITE SENT EMBED (slide from bottom) -->
+<div id="inviteSentEmbed" class="hidden" style="
+    position: fixed; bottom: -200px; left: 50%; transform: translateX(-50%);
+    width: 90%; max-width: 400px;
+    background: var(--cont); border: 2px solid var(--main);
+    border-radius: 20px; padding: 20px 22px;
+    box-shadow: 0 -8px 40px rgba(88,101,242,0.25);
+    z-index: 7000; text-align: center;
+    transition: bottom 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: flex; flex-direction: column; gap: 10px;
+">
+    <div style="display:flex; align-items:center; gap:12px;">
+        <div style="font-size:2rem; flex-shrink:0;">✉️</div>
+        <div style="text-align:left; flex:1;">
+            <div style="font-weight:bold; font-size:1rem; color:var(--main);">Einladung gesendet!</div>
+            <div style="font-size:0.85rem; color:#888; margin-top:2px;">Warte auf Antwort von <b id="inviteSentToName"></b>...</div>
+        </div>
+        <div class="invite-sent-spinner" style="
+            width: 22px; height: 22px; border-radius: 50%;
+            border: 3px solid var(--brd); border-top-color: var(--main);
+            animation: spin 1s linear infinite; flex-shrink:0;
+        "></div>
+    </div>
+    <button onclick="cancelPendingInvite()" class="danger" style="font-size:0.85rem; padding:9px;">
+        <i class="fas fa-times"></i> Einladung zurückziehen
+    </button>
+</div>
+
+<!-- MODALS -->
+<div id="logoutConfirmModal" class="modal-overlay hidden">
+    <div class="modal-card">
+        <h2 style="margin-top:0; color:var(--danger);">Abmelden?</h2>
+        <p>Möchtest du dich wirklich abmelden?</p>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:15px;">
+            <button class="danger" onclick="executeLogout()">Abmelden</button>
+            <button onclick="document.getElementById('logoutConfirmModal').classList.add('hidden')" class="secondary">Abbrechen</button>
+        </div>
+    </div>
+</div>
+<div id="leaveGameModal" class="modal-overlay hidden">
+    <div class="modal-card">
+        <h2 style="margin-top:0; color:var(--danger);">Spiel verlassen?</h2>
+        <p style="color:#888; font-size:0.9rem;">Wenn du das Spiel verlässt, verlierst du automatisch.</p>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:15px;">
+            <button class="danger" onclick="executeLeaveGame()">Verlassen</button>
+            <button onclick="document.getElementById('leaveGameModal').classList.add('hidden')" class="secondary">Weiter spielen</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const EMAIL_API_URL = "https://script.google.com/macros/s/AKfycbw-2c-SWu5EJKHGz84Us97lngunHjK5PwZ-N3XBJdj9Z95CLmzjuXNzzg2edO_PfPgvvw/exec";
+    const firebaseConfig = {
+        apiKey: "AIzaSyApz3w-zlUHvcRUedqsiunJTPZMXYzdvdo",
+        authDomain: "johnchat-97cbf.firebaseapp.com",
+        databaseURL: "https://johnchat-97cbf-default-rtdb.firebaseio.com",
+        projectId: "johnchat-97cbf",
+        storageBucket: "johnchat-97cbf.firebasestorage.app",
+        messagingSenderId: "652304721979",
+        appId: "1:652304721979:web:602baf7cc4893324a6141e"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // STATE
+    let currentUser = null, currentGameId = null, mySymbol = null;
+    let gameListener = null, inviteListener = null, presenceInterval = null, queueListener = null;
+    let aiDifficulty = null, isAiGame = false;
+    let localBoard = ['','','','','','','','',''];
+    let localScores = { X: 0, O: 0 };
+    let currentRound = 1, roundInProgress = false;
+    let pendingInviteId = null, pendingInviteFrom = null;
+    let inQueue = false;
+
+    // UTILS
+    function showView(id) {
+        document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+        document.getElementById(id).classList.remove('hidden');
+    }
+    function showRegisterRedirect() { document.getElementById('registerRedirectEmbed').classList.remove('hidden'); }
+    function triggerEmbed(text, type='success') {
+        const el = document.getElementById('systemEmbed');
+        el.innerText = text;
+        el.style.background = type === 'success' ? 'var(--success)' : 'var(--danger)';
+        el.classList.add('show');
+        setTimeout(() => el.classList.remove('show'), 3500);
+    }
+    function showGlobalLoading() { document.getElementById('globalLoading').classList.remove('hidden'); }
+    function hideGlobalLoading() { document.getElementById('globalLoading').classList.add('hidden'); }
+    function applyTheme(theme) {
+        if (theme === 'dark') document.body.classList.add('dark-mode');
+        else document.body.classList.remove('dark-mode');
+    }
+    function sendEmailViaScript(payload) {
+        fetch(EMAIL_API_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }).catch(()=>{});
+    }
+
+    // ON LOAD
+    window.addEventListener('load', () => {
+        const saved = localStorage.getItem('jttcUser');
+        if (saved) {
+            showGlobalLoading();
+            db.ref('users/' + saved).once('value').then(snap => {
+                if (snap.exists()) {
+                    const data = snap.val();
+                    if (data.banned === true) {
+                        if (data.banUntil && data.banUntil !== -1 && Date.now() > data.banUntil) {
+                            db.ref('users/' + saved + '/banned').remove();
+                        } else {
+                            hideGlobalLoading();
+                            document.getElementById('banMessage').innerText = data.banUntil === -1 ? 'Dein Account wurde PERMANENT gesperrt.' : 'Dein Account ist vorübergehend gesperrt.';
+                            if (data.banReason) document.getElementById('banReasonDisplay').innerText = 'Grund: ' + data.banReason;
+                            showView('bannedView'); return;
+                        }
+                    }
+                    currentUser = saved;
+                    applyTheme(data.theme);
+                    hideGlobalLoading();
+                    afterLogin();
+                } else {
+                    localStorage.removeItem('jttcUser');
+                    hideGlobalLoading();
+                    showView('homeView');
+                }
+            }).catch(() => { hideGlobalLoading(); showView('homeView'); });
+        } else { showView('homeView'); }
+    });
+
+    // ===== LOGIN — 2FA komplett entfernt =====
+    function login() {
+        const user = document.getElementById('loginUser').value.trim().toLowerCase();
+        const pass = document.getElementById('loginPass').value;
+        if (!user || !pass) return triggerEmbed('Benutzername & Passwort erforderlich!', 'danger');
+        showGlobalLoading();
+        db.ref('users/' + user).get().then(snap => {
+            const data = snap.val();
+            if (data && data.pass === pass) {
+                if (data.banned === true) {
+                    if (data.banUntil && data.banUntil !== -1 && Date.now() > data.banUntil) {
+                        db.ref('users/' + user + '/banned').remove();
+                    } else {
+                        hideGlobalLoading();
+                        document.getElementById('banMessage').innerText = data.banUntil === -1 ? 'Dein Account wurde PERMANENT gesperrt.' : 'Dein Account ist vorübergehend gesperrt.';
+                        if (data.banReason) document.getElementById('banReasonDisplay').innerText = 'Grund: ' + data.banReason;
+                        showView('bannedView'); return;
+                    }
+                }
+                // Kein 2FA — direkt einloggen
+                const stay = document.getElementById('keepLogin').checked;
+                if (stay) localStorage.setItem('jttcUser', user);
+                currentUser = user;
+                applyTheme(data.theme);
+                hideGlobalLoading();
+                afterLogin();
+            } else {
+                hideGlobalLoading();
+                triggerEmbed('Falscher Benutzername oder Passwort!', 'danger');
+            }
+        }).catch(() => { hideGlobalLoading(); triggerEmbed('Verbindungsfehler!', 'danger'); });
+    }
+
+    function afterLogin() {
+        document.getElementById('menuGreeting').innerText = 'Hi, ' + currentUser + ' 👋';
+        showView('menuView');
+        startPresence();
+        listenForInvites();
+    }
+
+    // FORGOT PASSWORD
+    function showForgotPassword() { document.getElementById('forgotPasswordEmbed').classList.remove('hidden'); }
+    function hideForgotPassword() {
+        document.getElementById('forgotPasswordEmbed').classList.add('hidden');
+        document.getElementById('forgotSuccessEmbed').classList.add('hidden');
+    }
+    function submitForgotPassword() {
+        const user = document.getElementById('forgotUser').value.trim().toLowerCase();
+        const email = document.getElementById('forgotEmail').value.trim().toLowerCase();
+        if (!user || !email) return triggerEmbed('Benutzername & E-Mail erforderlich!', 'danger');
+        db.ref('users/' + user).once('value', snap => {
+            const data = snap.val();
+            if (!data) return triggerEmbed('Benutzer nicht gefunden!', 'danger');
+            if (data.email && data.email.toLowerCase() === email) {
+                sendEmailViaScript({ to: email, subject: '🔑 Dein John Chat Passwort',
+                    htmlBody: `<h2>Passwort für ${user}</h2><p>Dein Passwort: <b style="font-size:1.2rem;color:#5865F2;">${data.pass}</b></p>` });
+                document.getElementById('forgotSuccessEmbed').classList.remove('hidden');
+            } else { triggerEmbed('E-Mail stimmt nicht überein!', 'danger'); }
+        });
+    }
+
+    // LOGOUT
+    function confirmLogout() { document.getElementById('logoutConfirmModal').classList.remove('hidden'); }
+    function executeLogout() {
+        cleanupOnLeave();
+        currentUser = null;
+        localStorage.removeItem('jttcUser');
+        document.getElementById('logoutConfirmModal').classList.add('hidden');
+        showView('homeView');
+    }
+
+    // PRESENCE
+    function startPresence() {
+        if (!currentUser) return;
+        const ref = db.ref('tictactoe/presence/' + currentUser);
+        ref.set(Date.now());
+        ref.onDisconnect().remove();
+        presenceInterval = setInterval(() => { if (currentUser) ref.set(Date.now()); }, 20000);
+    }
+    function stopPresence() {
+        if (presenceInterval) { clearInterval(presenceInterval); presenceInterval = null; }
+        if (currentUser) db.ref('tictactoe/presence/' + currentUser).remove();
+    }
+    function cleanupOnLeave() {
+        stopPresence(); stopInviteListener(); stopGameListener(); cancelMatchmakingCleanup();
+    }
+
+    // ===== FRIENDS GAME — Bugfix: lädt Freunde direkt aus users/{user}/friends =====
+    function openFriendsGame() {
+        showView('friendsView');
+        loadFriendsList();
+    }
+
+    function loadFriendsList() {
+        const container = document.getElementById('friendsGameList');
+        container.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><br>Freunde werden geladen...</div>';
+
+        db.ref('users/' + currentUser + '/friends').once('value').then(snap => {
+            const friendsData = snap.val();
+
+            if (!friendsData || typeof friendsData !== 'object') {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-users" style="font-size:2rem; display:block; margin-bottom:10px; color:#ccc;"></i>
+                        Keine Freunde vorhanden.<br>
+                        <small>Füge auf John Chat Freunde hinzu!</small>
+                    </div>`;
+                return;
+            }
+
+            const friendKeys = Object.keys(friendsData);
+
+            if (friendKeys.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-users" style="font-size:2rem; display:block; margin-bottom:10px; color:#ccc;"></i>
+                        Keine Freunde vorhanden.<br>
+                        <small>Füge auf John Chat Freunde hinzu!</small>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = '';
+            const now = Date.now();
+
+            // Alle Presence-Abfragen parallel ausführen
+            const presencePromises = friendKeys.map(friend =>
+                db.ref('tictactoe/presence/' + friend).once('value')
+                    .then(ps => ({
+                        friend,
+                        online: ps.exists() && (now - ps.val()) < 35000
+                    }))
+                    .catch(() => ({ friend, online: false }))
+            );
+
+            Promise.all(presencePromises).then(results => {
+                // Online-Freunde zuerst sortieren
+                results.sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0));
+
+                results.forEach(({ friend, online }) => {
+                    const div = document.createElement('div');
+                    div.className = 'friend-item';
+                    div.id = 'frow-' + friend;
+                    div.innerHTML = `
+                        <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
+                            <div style="width:10px; height:10px; border-radius:50%; flex-shrink:0; background:${online ? 'var(--success)' : '#bbb'};"></div>
+                            <div style="min-width:0; text-align:left;">
+                                <b style="font-size:0.95rem;">${friend}</b><br>
+                                <small style="color:${online ? 'var(--success)' : '#aaa'};">
+                                    ${online ? '✅ Auf TicTacToe online' : '⚪ Nicht auf TicTacToe'}
+                                </small>
+                            </div>
+                        </div>
+                        <button onclick="inviteFriend('${friend}')"
+                            style="padding:8px 14px; font-size:0.85rem; flex-shrink:0; margin-left:8px; ${online ? '' : 'background:#ccc;'}">
+                            <i class="fas fa-gamepad"></i> Spielen
+                        </button>`;
+                    container.appendChild(div);
+                });
+            });
+
+        }).catch(err => {
+            container.innerHTML = `<div class="empty-state" style="color:var(--danger);">⚠️ Fehler beim Laden der Freunde.<br><small>${err.message || 'Verbindungsfehler'}</small></div>`;
+        });
+    }
+
+    let pendingGameId = null;
+    let pendingInviteFriend = null;
+    let pendingInviteNodeId = null;
+
+    function showInviteSentEmbed(friend) {
+        document.getElementById('inviteSentToName').innerText = friend;
+        const el = document.getElementById('inviteSentEmbed');
+        el.classList.remove('hidden');
+        el.style.display = 'flex';
+        setTimeout(() => { el.style.bottom = '24px'; }, 20);
+    }
+
+    function hideInviteSentEmbed() {
+        const el = document.getElementById('inviteSentEmbed');
+        el.style.bottom = '-200px';
+        setTimeout(() => { el.classList.add('hidden'); el.style.display = 'none'; }, 500);
+    }
+
+    function cancelPendingInvite() {
+        hideInviteSentEmbed();
+        if (pendingGameId) {
+            db.ref('tictactoe/games/' + pendingGameId + '/status').off();
+            db.ref('tictactoe/games/' + pendingGameId).remove();
+            pendingGameId = null;
+        }
+        if (pendingInviteFriend && pendingInviteNodeId) {
+            db.ref('tictactoe/invites/' + pendingInviteFriend + '/' + pendingInviteNodeId).remove();
+        }
+        pendingInviteFriend = null;
+        pendingInviteNodeId = null;
+        triggerEmbed('Einladung zurückgezogen.', 'danger');
+    }
+
+    function inviteFriend(friend) {
+        db.ref('tictactoe/presence/' + friend).once('value', snap => {
+            const isOnline = snap.exists() && (Date.now() - snap.val()) < 35000;
+            if (!isOnline) {
+                triggerEmbed('⚠️ ' + friend + ' ist nicht auf John TicTacToe online!', 'danger');
+                return;
+            }
+
+            const gameId = db.ref('tictactoe/games').push().key;
+            pendingGameId = gameId;
+            pendingInviteFriend = friend;
+
+            db.ref('tictactoe/games/' + gameId).set({
+                playerX: currentUser, playerO: friend,
+                board: ['','','','','','','','',''],
+                currentTurn: 'X', status: 'waiting',
+                winnerSymbol: null, scores: { X:0, O:0 }, round: 1, created: Date.now()
+            });
+
+            const invId = db.ref('tictactoe/invites/' + friend).push().key;
+            pendingInviteNodeId = invId;
+            db.ref('tictactoe/invites/' + friend + '/' + invId).set({ from: currentUser, gameId, timestamp: Date.now() });
+
+            // Show the slide-up embed
+            showInviteSentEmbed(friend);
+
+            db.ref('tictactoe/games/' + gameId + '/status').on('value', s => {
+                if (s.val() === 'playing') {
+                    db.ref('tictactoe/games/' + gameId + '/status').off();
+                    hideInviteSentEmbed();
+                    startOnlineGame(gameId, 'X', friend);
+                } else if (s.val() === 'declined') {
+                    db.ref('tictactoe/games/' + gameId + '/status').off();
+                    db.ref('tictactoe/games/' + gameId).remove();
+                    hideInviteSentEmbed();
+                    triggerEmbed('❌ ' + friend + ' hat die Einladung abgelehnt.', 'danger');
+                    pendingGameId = null; pendingInviteFriend = null; pendingInviteNodeId = null;
+                }
+            });
+        });
+    }
+
+    // INVITE LISTENER
+    function listenForInvites() {
+        stopInviteListener();
+        inviteListener = db.ref('tictactoe/invites/' + currentUser).on('value', snap => {
+            if (!snap.exists()) { document.getElementById('inviteOverlay').classList.add('hidden'); return; }
+            const invites = snap.val();
+            const ids = Object.keys(invites);
+            if (ids.length === 0) return;
+            const id = ids[0];
+            const invite = invites[id];
+            if (Date.now() - (invite.timestamp || 0) > 60000) {
+                db.ref('tictactoe/invites/' + currentUser + '/' + id).remove(); return;
+            }
+            pendingInviteId = id;
+            pendingInviteFrom = invite.from;
+            document.getElementById('inviteFromName').innerText = invite.from;
+            document.getElementById('inviteOverlay').classList.remove('hidden');
+        });
+    }
+    function stopInviteListener() {
+        if (inviteListener && currentUser) {
+            db.ref('tictactoe/invites/' + currentUser).off('value', inviteListener);
+            inviteListener = null;
+        }
+    }
+    function acceptInvite() {
+        document.getElementById('inviteOverlay').classList.add('hidden');
+        if (!pendingInviteId) return;
+        db.ref('tictactoe/invites/' + currentUser + '/' + pendingInviteId).once('value', snap => {
+            const invite = snap.val();
+            if (!invite) return;
+            db.ref('tictactoe/invites/' + currentUser + '/' + pendingInviteId).remove();
+            db.ref('tictactoe/games/' + invite.gameId + '/status').set('playing');
+            startOnlineGame(invite.gameId, 'O', invite.from);
+        });
+    }
+    function declineInvite() {
+        document.getElementById('inviteOverlay').classList.add('hidden');
+        if (!pendingInviteId) return;
+        db.ref('tictactoe/invites/' + currentUser + '/' + pendingInviteId).once('value', snap => {
+            const invite = snap.val();
+            if (invite) db.ref('tictactoe/games/' + invite.gameId + '/status').set('declined');
+            db.ref('tictactoe/invites/' + currentUser + '/' + pendingInviteId).remove();
+        });
+        pendingInviteId = pendingInviteFrom = null;
+    }
+
+    // MATCHMAKING
+    function startMatchmaking() {
+        showView('matchmakingView');
+        inQueue = true;
+        db.ref('tictactoe/queue/' + currentUser).set({ timestamp: Date.now(), user: currentUser });
+        queueListener = db.ref('tictactoe/queue').on('value', snap => {
+            if (!inQueue || !snap.exists()) return;
+            const queue = snap.val();
+            const others = Object.keys(queue).filter(u => u !== currentUser);
+            const countEl = document.getElementById('queueCount');
+            if (countEl) countEl.innerText = Object.keys(queue).length + ' Spieler in der Warteschlange';
+            if (others.length > 0) {
+                const opponent = others[0];
+                if (currentUser < opponent) {
+                    const gameId = db.ref('tictactoe/games').push().key;
+                    db.ref('tictactoe/games/' + gameId).set({
+                        playerX: currentUser, playerO: opponent,
+                        board: ['','','','','','','','',''],
+                        currentTurn: 'X', status: 'playing',
+                        winnerSymbol: null, scores: { X:0, O:0 }, round: 1, created: Date.now()
+                    });
+                    db.ref('tictactoe/matchmade/' + opponent).set({ gameId, symbol:'O', opponent: currentUser, timestamp: Date.now() });
+                    cancelMatchmakingCleanup();
+                    startOnlineGame(gameId, 'X', opponent);
+                } else {
+                    db.ref('tictactoe/matchmade/' + currentUser).on('value', mSnap => {
+                        if (!mSnap.exists()) return;
+                        const d = mSnap.val();
+                        db.ref('tictactoe/matchmade/' + currentUser).off();
+                        db.ref('tictactoe/matchmade/' + currentUser).remove();
+                        cancelMatchmakingCleanup();
+                        startOnlineGame(d.gameId, d.symbol, d.opponent);
+                    });
+                }
+            }
+        });
+    }
+    function cancelMatchmakingCleanup() {
+        inQueue = false;
+        if (queueListener) { db.ref('tictactoe/queue').off('value', queueListener); queueListener = null; }
+        if (currentUser) db.ref('tictactoe/queue/' + currentUser).remove();
+    }
+    function cancelMatchmaking() { cancelMatchmakingCleanup(); showView('menuView'); }
+
+    // ONLINE GAME
+    function startOnlineGame(gameId, symbol, opponent) {
+        currentGameId = gameId; mySymbol = symbol; isAiGame = false;
+        localScores = { X:0, O:0 }; currentRound = 1; roundInProgress = false;
+        document.getElementById('gameTitle').innerText = 'vs ' + opponent;
+        document.getElementById('scoreNameX').innerText = symbol === 'X' ? currentUser : opponent;
+        document.getElementById('scoreNameO').innerText = symbol === 'O' ? currentUser : opponent;
+        document.getElementById('mwNameX').innerText = symbol === 'X' ? currentUser : opponent;
+        document.getElementById('mwNameO').innerText = symbol === 'O' ? currentUser : opponent;
+        document.getElementById('roundResultOverlay').classList.add('hidden');
+        document.getElementById('matchWonOverlay').classList.add('hidden');
+        updateScoreDisplay();
+        showView('gameView');
+        listenToGame();
+        db.ref('tictactoe/games/' + gameId + '/status').on('value', sSnap => {
+            if (sSnap.val() === 'abandoned') {
+                db.ref('tictactoe/games/' + gameId + '/status').off();
+                stopGameListener(); roundInProgress = true;
+                showMatchResult(true, true);
+            }
+        });
+    }
+
+    function listenToGame() {
+        stopGameListener();
+        gameListener = db.ref('tictactoe/games/' + currentGameId).on('value', snap => {
+            const data = snap.val();
+            if (!data) return;
+            localBoard = data.board || ['','','','','','','','',''];
+            renderBoard(localBoard);
+            updateTurnIndicator(data.currentTurn, data.playerX, data.playerO);
+            if (data.winnerSymbol && !roundInProgress) {
+                roundInProgress = true;
+                handleRoundEnd(data.winnerSymbol);
+            }
+        });
+    }
+    function stopGameListener() {
+        if (gameListener && currentGameId) {
+            db.ref('tictactoe/games/' + currentGameId).off('value', gameListener);
+            gameListener = null;
+        }
+    }
+
+    function handleCellClick(index) {
+        if (isAiGame) { handleAiCellClick(index); return; }
+        if (!currentGameId || roundInProgress || localBoard[index] !== '') return;
+        db.ref('tictactoe/games/' + currentGameId + '/currentTurn').once('value', snap => {
+            if (snap.val() !== mySymbol) return;
+            const newBoard = [...localBoard];
+            newBoard[index] = mySymbol;
+            const result = checkWinner(newBoard);
+            const updates = { board: newBoard, currentTurn: mySymbol === 'X' ? 'O' : 'X' };
+            if (result) { roundInProgress = true; updates.winnerSymbol = result; }
+            db.ref('tictactoe/games/' + currentGameId).update(updates);
+            if (result) handleRoundEnd(result);
+        });
+    }
+
+    // AI
+    function startAiGame(difficulty) {
+        aiDifficulty = difficulty; isAiGame = true;
+        currentGameId = 'ai_' + Date.now(); mySymbol = 'X';
+        localBoard = ['','','','','','','','',''];
+        localScores = { X:0, O:0 }; currentRound = 1; roundInProgress = false;
+        const names = { leicht:'🤖 KI (Leicht)', mittel:'🧠 KI (Mittel)', schwer:'💀 KI (Schwer)' };
+        document.getElementById('gameTitle').innerText = names[difficulty];
+        document.getElementById('scoreNameX').innerText = currentUser;
+        document.getElementById('scoreNameO').innerText = names[difficulty];
+        document.getElementById('mwNameX').innerText = currentUser;
+        document.getElementById('mwNameO').innerText = names[difficulty];
+        document.getElementById('roundResultOverlay').classList.add('hidden');
+        document.getElementById('matchWonOverlay').classList.add('hidden');
+        updateScoreDisplay(); showView('gameView');
+        renderBoard(localBoard); setTurnIndicatorLocal(true);
+    }
+    function handleAiCellClick(index) {
+        if (roundInProgress || localBoard[index] !== '') return;
+        localBoard[index] = 'X'; renderBoard(localBoard);
+        const r = checkWinner(localBoard);
+        if (r) { roundInProgress = true; handleRoundEnd(r); return; }
+        setTurnIndicatorLocal(false); roundInProgress = true;
+        setTimeout(() => {
+            const aiIdx = aiMove(localBoard, aiDifficulty);
+            if (aiIdx !== -1) {
+                localBoard[aiIdx] = 'O';
+                const ar = checkWinner(localBoard);
+                if (ar) { renderBoard(localBoard); handleRoundEnd(ar); return; }
+            }
+            // roundInProgress ZUERST auf false setzen, dann rendern —
+            // nur so entfernt renderBoard die .disabled-Klasse von leeren Feldern
+            roundInProgress = false;
+            renderBoard(localBoard);
+            setTurnIndicatorLocal(true);
+        }, 420);
+    }
+    function aiMove(board, diff) {
+        const empty = board.reduce((a,v,i) => v==='' ? [...a,i] : a, []);
+        if (!empty.length) return -1;
+        if (diff==='leicht') return empty[Math.floor(Math.random()*empty.length)];
+        if (diff==='mittel') {
+            const w=findBestMove(board,'O'); if(w!==-1) return w;
+            const b=findBestMove(board,'X'); if(b!==-1) return b;
+            if(board[4]==='') return 4;
+            return empty[Math.floor(Math.random()*empty.length)];
+        }
+        return minimaxBest(board);
+    }
+    function findBestMove(board, sym) {
+        const lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        for(const [a,b,c] of lines){const l=[board[a],board[b],board[c]]; if(l.filter(v=>v===sym).length===2&&l.includes('')) return [a,b,c][l.indexOf('')];}
+        return -1;
+    }
+    function minimaxBest(board) {
+        let best=-Infinity, idx=-1;
+        board.forEach((v,i)=>{ if(v!=='') return; board[i]='O'; const s=minimax(board,false); board[i]=''; if(s>best){best=s;idx=i;} });
+        return idx;
+    }
+    function minimax(board, max) {
+        const w=checkWinner(board);
+        if(w==='O') return 10; if(w==='X') return -10; if(w==='draw') return 0;
+        if(max){let b=-Infinity; board.forEach((v,i)=>{ if(v!=='') return; board[i]='O'; b=Math.max(b,minimax(board,false)); board[i]=''; }); return b;}
+        else {let b=Infinity; board.forEach((v,i)=>{ if(v!=='') return; board[i]='X'; b=Math.min(b,minimax(board,true)); board[i]=''; }); return b;}
+    }
+
+    // BOARD — Klassen immer komplett neu setzen, kein Dataset-Cache.
+    // Verhindert dass disabled/filled auf falschen Zellen hängen bleibt.
+    function renderBoard(board) {
+        for (let i = 0; i < 9; i++) {
+            const cell = document.getElementById('cell-' + i);
+            const val = board[i];
+            if (val === 'X') {
+                cell.className = 'cell filled x';
+                cell.innerText = '\u2715';
+            } else if (val === 'O') {
+                cell.className = 'cell filled o';
+                cell.innerText = '\u25cb';
+            } else {
+                cell.className = roundInProgress ? 'cell disabled' : 'cell';
+                cell.innerText = '';
+            }
+        }
+    }
+    function updateTurnIndicator(turn, pX, pO) {
+        const el = document.getElementById('turnIndicator');
+        const mine = turn === mySymbol;
+        el.className = 'turn-indicator ' + (mine ? 'my-turn' : 'not-my-turn');
+        el.innerText = mine ? '🟢 Du bist dran!' : `⏳ ${turn==='X'?pX:pO} ist dran...`;
+    }
+    function setTurnIndicatorLocal(mine) {
+        const el = document.getElementById('turnIndicator');
+        el.className = 'turn-indicator ' + (mine ? 'my-turn' : 'not-my-turn');
+        el.innerText = mine ? '🟢 Du bist dran!' : '⏳ KI denkt nach...';
+    }
+
+    // WIN CHECK
+    const WIN_LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    function checkWinner(board) {
+        for(const [a,b,c] of WIN_LINES) if(board[a]&&board[a]===board[b]&&board[b]===board[c]) return board[a];
+        if(board.every(v=>v!=='')) return 'draw';
+        return null;
+    }
+    function getWinLine(board) {
+        for(const line of WIN_LINES){const[a,b,c]=line; if(board[a]&&board[a]===board[b]&&board[b]===board[c]) return line;}
+        return null;
+    }
+
+    // ROUND END
+    function handleRoundEnd(result) {
+        renderBoard(localBoard);
+        if (result !== 'draw') {
+            const line = getWinLine(localBoard);
+            if (line) line.forEach(i => {
+                const cell = document.getElementById('cell-'+i);
+                if (cell) { cell.classList.add('win-cell'); if(result==='O') cell.classList.add('o'); }
+            });
+        }
+        setTimeout(() => {
+            if (result !== 'draw') localScores[result]++;
+            updateScoreDisplay();
+            const pw = result === mySymbol, isDraw = result === 'draw';
+            document.getElementById('roundResultEmoji').innerText = isDraw ? '🤝' : pw ? '🎉' : '😢';
+            const t = document.getElementById('roundResultTitle');
+            t.innerText = isDraw ? 'Unentschieden!' : pw ? 'Runde gewonnen!' : 'Runde verloren!';
+            t.style.color = isDraw ? '#888' : pw ? 'var(--success)' : 'var(--danger)';
+            document.getElementById('roundResultSub').innerText = `Stand: ${localScores.X} : ${localScores.O} (Runde ${currentRound}/3)`;
+            const done = localScores.X >= 2 || localScores.O >= 2 || currentRound >= 3;
+            const btn = document.getElementById('nextRoundBtn');
+            btn.innerText = done ? 'Ergebnis anzeigen' : 'Nächste Runde ▶';
+            btn.onclick = done ? () => showMatchResult(false) : nextRound;
+            document.getElementById('roundResultOverlay').classList.remove('hidden');
+        }, 700);
+    }
+
+    function resetBoardUI() {
+        for (let i = 0; i < 9; i++) {
+            const cell = document.getElementById('cell-' + i);
+            if (cell) {
+                delete cell.dataset.val;
+                cell.innerText = '';
+                cell.className = 'cell';
+            }
+        }
+    }
+
+    function nextRound() {
+        currentRound++;
+        document.getElementById('roundResultOverlay').classList.add('hidden');
+        document.getElementById('roundBadge').innerText = 'Runde ' + currentRound + '/3';
+        roundInProgress = false;
+        resetBoardUI();
+        if (isAiGame) { localBoard = ['','','','','','','','','']; renderBoard(localBoard); setTurnIndicatorLocal(true); }
+        else { db.ref('tictactoe/games/'+currentGameId).update({ board:['','','','','','','','',''], currentTurn: currentRound%2===0?'O':'X', winnerSymbol:null }); }
+    }
+
+    function showMatchResult(isAbandonment, youWon) {
+        document.getElementById('roundResultOverlay').classList.add('hidden');
+        let pw = isAbandonment ? youWon : localScores[mySymbol] > localScores[mySymbol==='X'?'O':'X'];
+        const isDraw = !isAbandonment && localScores.X === localScores.O;
+        document.getElementById('matchWonEmoji').innerText = isDraw ? '🤝' : pw ? '🏆' : '💀';
+        const t = document.getElementById('matchWonTitle');
+        t.innerText = isDraw ? 'Match Unentschieden!' : pw ? 'Du hast das Match gewonnen!' : 'Match verloren!';
+        t.style.color = isDraw ? '#888' : pw ? 'var(--success)' : 'var(--danger)';
+        document.getElementById('matchWonSub').innerText = isAbandonment ? 'Gegner hat das Spiel verlassen.' : `Endstand: ${localScores.X} : ${localScores.O}`;
+        document.getElementById('mwScoreX').innerText = localScores.X;
+        document.getElementById('mwScoreO').innerText = localScores.O;
+        document.getElementById('matchWonOverlay').classList.remove('hidden');
+        if (!isAiGame && currentGameId) { db.ref('tictactoe/games/'+currentGameId).remove(); stopGameListener(); }
+    }
+
+    function updateScoreDisplay() {
+        document.getElementById('scoreX').innerText = localScores.X;
+        document.getElementById('scoreO').innerText = localScores.O;
+        document.getElementById('roundBadge').innerText = 'Runde ' + currentRound + '/3';
+    }
+
+    function backToMenu() {
+        document.getElementById('matchWonOverlay').classList.add('hidden');
+        stopGameListener(); currentGameId = null; mySymbol = null; roundInProgress = false;
+        showView('menuView');
+    }
+
+    function confirmLeaveGame() { document.getElementById('leaveGameModal').classList.remove('hidden'); }
+    function executeLeaveGame() {
+        document.getElementById('leaveGameModal').classList.add('hidden');
+        if (!isAiGame && currentGameId) { db.ref('tictactoe/games/'+currentGameId+'/status').set('abandoned'); stopGameListener(); }
+        document.getElementById('matchWonOverlay').classList.add('hidden');
+        document.getElementById('roundResultOverlay').classList.add('hidden');
+        currentGameId = null; mySymbol = null; roundInProgress = false;
+        showView('menuView');
+    }
+
+    window.addEventListener('beforeunload', () => {
+        cleanupOnLeave();
+        if (!isAiGame && currentGameId) db.ref('tictactoe/games/'+currentGameId+'/status').set('abandoned');
+    });
+</script>
+</body>
+</html>
+    
+  </body>
+  
+</html>
