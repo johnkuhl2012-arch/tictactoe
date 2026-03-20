@@ -1035,99 +1035,66 @@
         return -1;
     }
     // Erkennt ob Gegner schlau gespielt hat (Mitte oder Ecke als ersten Zug)
-    function opponentPlayedSmart(board) {
-        const xMoves = board.map((v,i)=>v==='X'?i:-1).filter(i=>i!==-1);
-        if(xMoves.length===0) return false;
-        // Schlau: Mitte oder Ecke als erster Zug
-        return xMoves.some(i=>[0,2,4,6,8].includes(i));
-    }
+    // Positionale Gewichtung: Mitte > Ecken > Kanten
+    const POS_WEIGHT = [3,1,3,1,5,1,3,1,3];
 
-    // Lockt den Gegner in eine Falle: setzt absichtlich suboptimal um Gabel zu erzeugen
-    function trickMove(board) {
+    // Zaehlt wie viele Gabeln (doppelte Drohungen) ein Zug erzeugt
+    function countForks(board, sym) {
         const lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-        // Setze so dass 2 versteckte Gewinnlinien entstehen (Falle)
-        for(let i=0;i<9;i++){
-            if(board[i]!=='') continue;
-            board[i]='O';
-            let future=0;
-            for(const [a,b,c] of lines){
-                const l=[board[a],board[b],board[c]];
-                // Linie mit einer O und zwei Leer = zukuenftige Drohung
-                if(l.filter(v=>v==='O').length===1 && l.filter(v=>v==='').length===2) future++;
-            }
-            board[i]='';
-            if(future>=3) return i; // viele offene Linien = maximale Verwirrung
+        let forks=0;
+        for(const [a,b,c] of lines){
+            const l=[board[a],board[b],board[c]];
+            if(l.filter(v=>v===sym).length===2 && l.includes('')) forks++;
         }
-        return -1;
+        return forks;
     }
 
     function minimaxBest(board) {
-        // Sofortiger Gewinnzug
+        const lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+        // 1. MINIMAX — findet den mathematisch besten Score
+        let bestScore=-Infinity;
+        const scores=[];
         for(let i=0;i<9;i++){
-            if(board[i]!=='') continue;
-            board[i]='O';
-            if(checkWinner(board)==='O'){board[i]=''; return i;}
-            board[i]='';
-        }
-        // Gegner sofort blocken
-        for(let i=0;i<9;i++){
-            if(board[i]!=='') continue;
-            board[i]='X';
-            if(checkWinner(board)==='X'){board[i]=''; return i;}
-            board[i]='';
-        }
-        // Wenn Gegner schlau war: Trick-Zug versuchen um ihn zu verwirren
-        if(opponentPlayedSmart(board) && currentRound > 1) {
-            const trick = trickMove(board);
-            if(trick !== -1) return trick;
-        }
-        // Gabel aufbauen (zwei Gewinnmoeglichkeiten gleichzeitig)
-        for(let i=0;i<9;i++){
-            if(board[i]!=='') continue;
-            board[i]='O';
-            let threats=0;
-            const lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            for(const [a,b,c] of lines){
-                const l=[board[a],board[b],board[c]];
-                if(l.filter(v=>v==='O').length===2 && l.includes('')) threats++;
-            }
-            board[i]='';
-            if(threats>=2) return i;
-        }
-        // Mitte
-        if(board[4]==='') return 4;
-        // Gegenecke bevorzugt
-        const corners=[[0,8],[2,6],[6,2],[8,0]];
-        for(const [c,opp] of corners){
-            if(board[c]==='' && board[opp]==='X') return c;
-        }
-        // Freie Ecke
-        for(const c of [0,2,6,8]){
-            if(board[c]==='') return c;
-        }
-        // Kanten
-        for(const e of [1,3,5,7]){
-            if(board[e]==='') return e;
-        }
-        // Minimax Fallback
-        let best=-Infinity, idx=-1;
-        for(let i=0;i<9;i++){
-            if(board[i]!=='') continue;
+            if(board[i]!==''){scores.push(-Infinity);continue;}
             board[i]='O';
             const s=minimax(board,false,0,-Infinity,Infinity);
             board[i]='';
-            if(s>best){best=s;idx=i;}
+            scores.push(s);
+            if(s>bestScore) bestScore=s;
         }
-        return idx;
+
+        // 2. Alle Zuege mit bestem Score sammeln
+        const best=[];
+        for(let i=0;i<9;i++) if(scores[i]===bestScore) best.push(i);
+
+        // 3. Nur ein Kandidat -> sofort zurueck
+        if(best.length===1) return best[0];
+
+        // 4. Tiebreaker: bevorzuge Zug der die meisten Gabeln erzeugt
+        let topForks=-1, topIdx=best[0];
+        for(const i of best){
+            board[i]='O';
+            const f=countForks(board,'O');
+            // Bonus: verhindert auch Gabelaufbau des Gegners
+            const oppForks=countForks(board,'X');
+            const score=f*10 - oppForks*8 + POS_WEIGHT[i];
+            board[i]='';
+            if(score>topForks){topForks=score;topIdx=i;}
+        }
+        return topIdx;
     }
+
     function minimax(board, max, depth, alpha, beta) {
         const w=checkWinner(board);
         if(w==='O') return 100-depth;
         if(w==='X') return depth-100;
         if(w==='draw') return 0;
+        // Zugreihenfolge: Mitte, Ecken, Kanten — schnelleres Pruning
+        const order=[4,0,2,6,8,1,3,5,7];
         if(max){
             let b=-Infinity;
-            for(let i=0;i<9;i++){
+            for(const i of order){
                 if(board[i]!=='') continue;
                 board[i]='O'; b=Math.max(b,minimax(board,false,depth+1,alpha,beta)); board[i]='';
                 alpha=Math.max(alpha,b); if(beta<=alpha) break;
@@ -1135,7 +1102,7 @@
             return b;
         } else {
             let b=Infinity;
-            for(let i=0;i<9;i++){
+            for(const i of order){
                 if(board[i]!=='') continue;
                 board[i]='X'; b=Math.min(b,minimax(board,true,depth+1,alpha,beta)); board[i]='';
                 beta=Math.min(beta,b); if(beta<=alpha) break;
@@ -1285,7 +1252,33 @@
         if (aiAssistActive) {
             btn.innerText = 'KI Aktiv';
             btn.style.background = '#5865F2';
-            if (isAiGame) maybeAiAssistPlayLocal();
+            if (isAiGame) {
+                // Solo: sofort loslegen wenn dran
+                if (!roundInProgress) maybeAiAssistPlayLocal();
+            } else {
+                // Online: sofort pruefen ob Knödel gerade dran ist
+                if (!roundInProgress && currentGameId) {
+                    db.ref('tictactoe/games/'+currentGameId+'/currentTurn').once('value', tSnap => {
+                        if (!aiAssistActive || roundInProgress) return;
+                        if (tSnap.val() !== mySymbol) return;
+                        setTimeout(() => {
+                            if (!aiAssistActive || roundInProgress) return;
+                            db.ref('tictactoe/games/'+currentGameId+'/currentTurn').once('value', t2 => {
+                                if (t2.val() !== mySymbol) return;
+                                const bestIdx = minimaxBest(localBoard.slice());
+                                if (bestIdx === -1) return;
+                                const newBoard = [...localBoard];
+                                newBoard[bestIdx] = mySymbol;
+                                const result = checkWinner(newBoard);
+                                const updates = { board: newBoard, currentTurn: mySymbol==='X'?'O':'X' };
+                                if (result) { roundInProgress = true; updates.winnerSymbol = result; }
+                                db.ref('tictactoe/games/'+currentGameId).update(updates);
+                                if (result) handleRoundEnd(result);
+                            });
+                        }, 2000);
+                    });
+                }
+            }
         } else {
             btn.innerText = 'KI Aus';
             btn.style.background = '#555';
