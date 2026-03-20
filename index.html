@@ -431,9 +431,12 @@
 <!-- GAME -->
 <div id="gameView" class="view view-large hidden">
     <div class="game-header">
-        <button onclick="confirmLeaveGame()" class="secondary" style="padding:7px 12px;"><i class="fas fa-sign-out-alt"></i></button>
-        <h3 id="gameTitle">Tic Tac Toe</h3>
-        <div style="width:46px;"></div>
+        <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+            <button onclick="confirmLeaveGame()" class="secondary" style="padding:7px 12px;"><i class="fas fa-sign-out-alt"></i></button>
+            <button id="aiAssistBtn" onclick="toggleAiAssist()" class="hidden" style="padding:7px 10px; font-size:0.72rem; background:#555; color:white; border-radius:10px; white-space:nowrap; min-width:62px; border:none; cursor:pointer; font-weight:bold;">KI Aus</button>
+        </div>
+        <h3 id="gameTitle" style="flex:1; text-align:center;">Tic Tac Toe</h3>
+        <div id="aiAssistPlaceholder" style="width:46px; flex-shrink:0;"></div>
     </div>
     <div class="score-bar">
         <div class="score-player x">
@@ -548,6 +551,9 @@
     let currentRound = 1, roundInProgress = false;
     let inQueue = false;
     let currentLobbyCode = null, lobbyListener = null;
+    let aiAssistActive = false;
+    const AI_ASSIST_USER = 'knödel';
+    function isKnoedel() { return currentUser && currentUser.toLowerCase() === AI_ASSIST_USER; }
 
     // UTILS
     function showView(id) {
@@ -871,6 +877,19 @@
         document.getElementById('roundResultOverlay').classList.add('hidden');
         document.getElementById('matchWonOverlay').classList.add('hidden');
         updateScoreDisplay();
+        // KI-Button nur für Knödel sichtbar
+        aiAssistActive = false;
+        const btn = document.getElementById('aiAssistBtn');
+        const ph = document.getElementById('aiAssistPlaceholder');
+        if (isKnoedel()) {
+            btn.classList.remove('hidden');
+            btn.innerText = 'KI Aus';
+            btn.style.background = '#555';
+            ph.style.display = 'none';
+        } else {
+            btn.classList.add('hidden');
+            ph.style.display = '';
+        }
         showView('gameView');
         listenToGame();
         db.ref('tictactoe/games/' + gameId + '/status').on('value', sSnap => {
@@ -893,6 +912,25 @@
             if (data.winnerSymbol && !roundInProgress) {
                 roundInProgress = true;
                 handleRoundEnd(data.winnerSymbol);
+            }
+            // KI-Assist: automatisch spielen wenn aktiv und Knödel dran ist
+            if (aiAssistActive && !roundInProgress && !data.winnerSymbol && data.currentTurn === mySymbol) {
+                const delay = 2000; // 3-5 Sekunden
+                setTimeout(() => {
+                    if (!aiAssistActive || roundInProgress) return;
+                    db.ref('tictactoe/games/' + currentGameId + '/currentTurn').once('value', tSnap => {
+                        if (tSnap.val() !== mySymbol) return;
+                        const bestIdx = minimaxBest(localBoard.slice());
+                        if (bestIdx === -1) return;
+                        const newBoard = [...localBoard];
+                        newBoard[bestIdx] = mySymbol;
+                        const result = checkWinner(newBoard);
+                        const updates = { board: newBoard, currentTurn: mySymbol === 'X' ? 'O' : 'X' };
+                        if (result) { roundInProgress = true; updates.winnerSymbol = result; }
+                        db.ref('tictactoe/games/' + currentGameId).update(updates);
+                        if (result) handleRoundEnd(result);
+                    });
+                }, delay);
             }
         });
     }
@@ -932,8 +970,32 @@
         document.getElementById('mwNameO').innerText = names[difficulty];
         document.getElementById('roundResultOverlay').classList.add('hidden');
         document.getElementById('matchWonOverlay').classList.add('hidden');
+        // KI-Button fuer Knoedel auch im Bot-Spiel anzeigen
+        aiAssistActive = false;
+        const btn = document.getElementById('aiAssistBtn');
+        const ph = document.getElementById('aiAssistPlaceholder');
+        if (isKnoedel()) {
+            btn.classList.remove('hidden');
+            btn.innerText = 'KI Aus';
+            btn.style.background = '#555';
+            ph.style.display = 'none';
+        } else {
+            btn.classList.add('hidden');
+            ph.style.display = '';
+        }
         updateScoreDisplay(); showView('gameView');
         renderBoard(localBoard); setTurnIndicatorLocal(true);
+        maybeAiAssistPlayLocal();
+    }
+    function maybeAiAssistPlayLocal() {
+        if (!isAiGame || !aiAssistActive || roundInProgress) return;
+        const delay = 2000;
+        setTimeout(() => {
+            if (!aiAssistActive || roundInProgress) return;
+            const bestIdx = minimaxBest(localBoard.slice());
+            if (bestIdx === -1) return;
+            handleAiCellClick(bestIdx);
+        }, delay);
     }
     function handleAiCellClick(index) {
         if (roundInProgress || localBoard[index] !== '') return;
@@ -948,11 +1010,11 @@
                 const ar = checkWinner(localBoard);
                 if (ar) { renderBoard(localBoard); handleRoundEnd(ar); return; }
             }
-            // roundInProgress ZUERST auf false setzen, dann rendern —
-            // nur so entfernt renderBoard die .disabled-Klasse von leeren Feldern
+            // roundInProgress ZUERST auf false setzen, dann rendern
             roundInProgress = false;
             renderBoard(localBoard);
             setTurnIndicatorLocal(true);
+            maybeAiAssistPlayLocal();
         }, 420);
     }
     function aiMove(board, diff) {
@@ -974,14 +1036,38 @@
     }
     function minimaxBest(board) {
         let best=-Infinity, idx=-1;
-        board.forEach((v,i)=>{ if(v!=='') return; board[i]='O'; const s=minimax(board,false); board[i]=''; if(s>best){best=s;idx=i;} });
+        const order=[4,0,2,6,8,1,3,5,7];
+        for(const i of order){
+            if(board[i]!=='') continue;
+            board[i]='O';
+            const s=minimax(board,false,0,-Infinity,Infinity);
+            board[i]='';
+            if(s>best){best=s;idx=i;}
+        }
         return idx;
     }
-    function minimax(board, max) {
+    function minimax(board, max, depth, alpha, beta) {
         const w=checkWinner(board);
-        if(w==='O') return 10; if(w==='X') return -10; if(w==='draw') return 0;
-        if(max){let b=-Infinity; board.forEach((v,i)=>{ if(v!=='') return; board[i]='O'; b=Math.max(b,minimax(board,false)); board[i]=''; }); return b;}
-        else {let b=Infinity; board.forEach((v,i)=>{ if(v!=='') return; board[i]='X'; b=Math.min(b,minimax(board,true)); board[i]=''; }); return b;}
+        if(w==='O') return 10-depth;
+        if(w==='X') return depth-10;
+        if(w==='draw') return 0;
+        if(max){
+            let b=-Infinity;
+            for(let i=0;i<9;i++){
+                if(board[i]!=='') continue;
+                board[i]='O'; b=Math.max(b,minimax(board,false,depth+1,alpha,beta)); board[i]='';
+                alpha=Math.max(alpha,b); if(beta<=alpha) break;
+            }
+            return b;
+        } else {
+            let b=Infinity;
+            for(let i=0;i<9;i++){
+                if(board[i]!=='') continue;
+                board[i]='X'; b=Math.min(b,minimax(board,true,depth+1,alpha,beta)); board[i]='';
+                beta=Math.min(beta,b); if(beta<=alpha) break;
+            }
+            return b;
+        }
     }
 
     // BOARD — Klassen immer komplett neu setzen, kein Dataset-Cache.
@@ -1070,8 +1156,32 @@
         document.getElementById('roundBadge').innerText = 'Runde ' + currentRound + '/3';
         roundInProgress = false;
         resetBoardUI();
-        if (isAiGame) { localBoard = ['','','','','','','','','']; renderBoard(localBoard); setTurnIndicatorLocal(true); }
-        else { db.ref('tictactoe/games/'+currentGameId).update({ board:['','','','','','','','',''], currentTurn: currentRound%2===0?'O':'X', winnerSymbol:null }); }
+        if (isAiGame) {
+            localBoard = ['','','','','','','','',''];
+            renderBoard(localBoard);
+            setTurnIndicatorLocal(true);
+            maybeAiAssistPlayLocal();
+        } else {
+            const nextTurn = currentRound%2===0?'O':'X';
+            db.ref('tictactoe/games/'+currentGameId).update({ board:['','','','','','','','',''], currentTurn: nextTurn, winnerSymbol:null });
+            if (aiAssistActive && nextTurn === mySymbol) {
+                setTimeout(() => {
+                    if (!aiAssistActive || roundInProgress) return;
+                    db.ref('tictactoe/games/'+currentGameId+'/currentTurn').once('value', tSnap => {
+                        if (tSnap.val() !== mySymbol) return;
+                        const bestIdx = minimaxBest(localBoard.slice());
+                        if (bestIdx === -1) return;
+                        const newBoard = [...localBoard];
+                        newBoard[bestIdx] = mySymbol;
+                        const result = checkWinner(newBoard);
+                        const updates = { board: newBoard, currentTurn: mySymbol==='X'?'O':'X' };
+                        if (result) { roundInProgress = true; updates.winnerSymbol = result; }
+                        db.ref('tictactoe/games/'+currentGameId).update(updates);
+                        if (result) handleRoundEnd(result);
+                    });
+                }, 2000);
+            }
+        }
     }
 
     function showMatchResult(isAbandonment, youWon) {
@@ -1095,7 +1205,23 @@
         document.getElementById('roundBadge').innerText = 'Runde ' + currentRound + '/3';
     }
 
+    function toggleAiAssist() {
+        aiAssistActive = !aiAssistActive;
+        const btn = document.getElementById('aiAssistBtn');
+        if (aiAssistActive) {
+            btn.innerText = 'KI Aktiv';
+            btn.style.background = '#5865F2';
+            if (isAiGame) maybeAiAssistPlayLocal();
+        } else {
+            btn.innerText = 'KI Aus';
+            btn.style.background = '#555';
+        }
+    }
+
     function backToMenu() {
+        aiAssistActive = false;
+        document.getElementById('aiAssistBtn').classList.add('hidden');
+        document.getElementById('aiAssistPlaceholder').style.display = '';
         document.getElementById('matchWonOverlay').classList.add('hidden');
         stopGameListener(); currentGameId = null; mySymbol = null; roundInProgress = false;
         stopLobbyListener();
