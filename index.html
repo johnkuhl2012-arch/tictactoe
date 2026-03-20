@@ -3,7 +3,7 @@
 
   <head>
     <meta charset="UTF-8">
-    <title>Untitled</title>
+    <title>TicTacToe</title>
     
 
   </head>
@@ -393,7 +393,7 @@
         <h3>Lobby beitreten</h3>
         <div style="width:46px;"></div>
     </div>
-    <div style="display:flex; flex-direction:column; align-items:center; gap:16px; padding:20px 0;">
+    <div id="lobbyJoinInputArea" style="display:flex; flex-direction:column; align-items:center; gap:16px; padding:20px 0;">
         <div style="font-size:3rem;">🔑</div>
         <p style="margin:0; color:#888; font-size:0.9rem; text-align:center;">Gib den Lobby-Code ein:</p>
         <input type="text" id="joinLobbyCodeInput" placeholder="z.B. AB12CD" maxlength="6"
@@ -401,10 +401,12 @@
             oninput="this.value=this.value.toUpperCase()">
         <button onclick="joinLobbyByCode()" style="width:100%;"><i class="fas fa-sign-in-alt"></i> Beitreten</button>
     </div>
-    <div id="lobbyJoinWait" class="hidden" style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:10px 0;">
-        <div style="width:48px;height:48px;border-radius:50%;border:5px solid var(--brd);border-top-color:var(--main);animation:spin 1s linear infinite;"></div>
-        <p style="margin:0; color:#888; font-size:0.9rem;">Warte darauf, dass der Host das Spiel startet...</p>
-        <button onclick="leaveJoinLobby()" class="danger" style="font-size:0.85rem; padding:9px;"><i class="fas fa-times"></i> Verlassen</button>
+    <div id="lobbyJoinWait" class="hidden" style="flex-direction:column;align-items:center;gap:14px;padding:20px 0;">
+        <div style="font-size:3rem; margin-bottom:5px;">⏳</div>
+        <p style="margin:0; font-weight:bold; font-size:1.05rem;">In der Lobby</p>
+        <p style="margin:0; color:#888; font-size:0.9rem; text-align:center;">Warte darauf, dass der Host das Spiel startet...</p>
+        <div style="width:48px;height:48px;border-radius:50%;border:5px solid var(--brd);border-top-color:var(--main);animation:spin 1s linear infinite; margin:10px 0;"></div>
+        <button onclick="leaveJoinLobby()" class="danger" style="font-size:0.85rem; padding:9px; width:100%;"><i class="fas fa-times"></i> Lobby verlassen</button>
     </div>
 </div>
 
@@ -753,22 +755,30 @@
 
     function openJoinLobby() {
         document.getElementById('joinLobbyCodeInput').value = '';
+        document.getElementById('lobbyJoinInputArea').style.display = 'flex';
         document.getElementById('lobbyJoinWait').classList.add('hidden');
+        document.getElementById('lobbyJoinWait').style.display = 'none';
         showView('lobbyJoinView');
     }
 
     function joinLobbyByCode() {
         const code = document.getElementById('joinLobbyCodeInput').value.trim().toUpperCase();
         if (code.length < 4) return triggerEmbed('Bitte Code eingeben!', 'danger');
-        db.ref('tictactoe/lobbies/' + code).once('value', snap => {
+        db.ref('tictactoe/lobbies/' + code).once('value').then(snap => {
             const d = snap.val();
             if (!d) return triggerEmbed('Lobby nicht gefunden!', 'danger');
             if (d.status !== 'waiting') return triggerEmbed('Lobby bereits gestartet!', 'danger');
             if (d.guest) return triggerEmbed('Lobby ist bereits voll!', 'danger');
             if (d.host === currentUser) return triggerEmbed('Das ist deine eigene Lobby!', 'danger');
             currentLobbyCode = code;
+            // Eingabe ausblenden, Warte-UI zeigen
+            document.getElementById('lobbyJoinInputArea').style.display = 'none';
+            const waitEl = document.getElementById('lobbyJoinWait');
+            waitEl.classList.remove('hidden');
+            waitEl.style.display = 'flex';
+            // Gast in DB eintragen
             db.ref('tictactoe/lobbies/' + code).update({ guest: currentUser });
-            document.getElementById('lobbyJoinWait').classList.remove('hidden');
+            // Auf Host-Start warten
             lobbyListener = db.ref('tictactoe/lobbies/' + code).on('value', snap2 => {
                 const d2 = snap2.val();
                 if (!d2) { leaveJoinLobby(); triggerEmbed('Lobby wurde geschlossen.', 'danger'); return; }
@@ -777,7 +787,7 @@
                     startOnlineGame(d2.gameId, 'O', d2.host);
                 }
             });
-        });
+        }).catch(() => triggerEmbed('Verbindungsfehler!', 'danger'));
     }
 
     function leaveJoinLobby() {
@@ -786,6 +796,9 @@
             db.ref('tictactoe/lobbies/' + currentLobbyCode + '/guest').remove();
             currentLobbyCode = null;
         }
+        document.getElementById('lobbyJoinInputArea').style.display = 'flex';
+        document.getElementById('lobbyJoinWait').classList.add('hidden');
+        document.getElementById('lobbyJoinWait').style.display = 'none';
         showView('menuView');
     }
 
