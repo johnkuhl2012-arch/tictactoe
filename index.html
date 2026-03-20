@@ -1034,10 +1034,84 @@
         for(const [a,b,c] of lines){const l=[board[a],board[b],board[c]]; if(l.filter(v=>v===sym).length===2&&l.includes('')) return [a,b,c][l.indexOf('')];}
         return -1;
     }
+    // Erkennt ob Gegner schlau gespielt hat (Mitte oder Ecke als ersten Zug)
+    function opponentPlayedSmart(board) {
+        const xMoves = board.map((v,i)=>v==='X'?i:-1).filter(i=>i!==-1);
+        if(xMoves.length===0) return false;
+        // Schlau: Mitte oder Ecke als erster Zug
+        return xMoves.some(i=>[0,2,4,6,8].includes(i));
+    }
+
+    // Lockt den Gegner in eine Falle: setzt absichtlich suboptimal um Gabel zu erzeugen
+    function trickMove(board) {
+        const lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        // Setze so dass 2 versteckte Gewinnlinien entstehen (Falle)
+        for(let i=0;i<9;i++){
+            if(board[i]!=='') continue;
+            board[i]='O';
+            let future=0;
+            for(const [a,b,c] of lines){
+                const l=[board[a],board[b],board[c]];
+                // Linie mit einer O und zwei Leer = zukuenftige Drohung
+                if(l.filter(v=>v==='O').length===1 && l.filter(v=>v==='').length===2) future++;
+            }
+            board[i]='';
+            if(future>=3) return i; // viele offene Linien = maximale Verwirrung
+        }
+        return -1;
+    }
+
     function minimaxBest(board) {
+        // Sofortiger Gewinnzug
+        for(let i=0;i<9;i++){
+            if(board[i]!=='') continue;
+            board[i]='O';
+            if(checkWinner(board)==='O'){board[i]=''; return i;}
+            board[i]='';
+        }
+        // Gegner sofort blocken
+        for(let i=0;i<9;i++){
+            if(board[i]!=='') continue;
+            board[i]='X';
+            if(checkWinner(board)==='X'){board[i]=''; return i;}
+            board[i]='';
+        }
+        // Wenn Gegner schlau war: Trick-Zug versuchen um ihn zu verwirren
+        if(opponentPlayedSmart(board) && currentRound > 1) {
+            const trick = trickMove(board);
+            if(trick !== -1) return trick;
+        }
+        // Gabel aufbauen (zwei Gewinnmoeglichkeiten gleichzeitig)
+        for(let i=0;i<9;i++){
+            if(board[i]!=='') continue;
+            board[i]='O';
+            let threats=0;
+            const lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            for(const [a,b,c] of lines){
+                const l=[board[a],board[b],board[c]];
+                if(l.filter(v=>v==='O').length===2 && l.includes('')) threats++;
+            }
+            board[i]='';
+            if(threats>=2) return i;
+        }
+        // Mitte
+        if(board[4]==='') return 4;
+        // Gegenecke bevorzugt
+        const corners=[[0,8],[2,6],[6,2],[8,0]];
+        for(const [c,opp] of corners){
+            if(board[c]==='' && board[opp]==='X') return c;
+        }
+        // Freie Ecke
+        for(const c of [0,2,6,8]){
+            if(board[c]==='') return c;
+        }
+        // Kanten
+        for(const e of [1,3,5,7]){
+            if(board[e]==='') return e;
+        }
+        // Minimax Fallback
         let best=-Infinity, idx=-1;
-        const order=[4,0,2,6,8,1,3,5,7];
-        for(const i of order){
+        for(let i=0;i<9;i++){
             if(board[i]!=='') continue;
             board[i]='O';
             const s=minimax(board,false,0,-Infinity,Infinity);
@@ -1048,8 +1122,8 @@
     }
     function minimax(board, max, depth, alpha, beta) {
         const w=checkWinner(board);
-        if(w==='O') return 10-depth;
-        if(w==='X') return depth-10;
+        if(w==='O') return 100-depth;
+        if(w==='X') return depth-100;
         if(w==='draw') return 0;
         if(max){
             let b=-Infinity;
