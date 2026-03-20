@@ -319,9 +319,14 @@
         <div class="menu-text"><span class="menu-title">Solo Spiel</span><span class="menu-sub">Spiele gegen eine KI</span></div>
         <i class="fas fa-chevron-right" style="color:#ccc;"></i>
     </button>
-    <button class="menu-btn" onclick="openFriendsGame()">
-        <div class="menu-icon">👥</div>
-        <div class="menu-text"><span class="menu-title">Freundes Spiel</span><span class="menu-sub">Fordere Freunde heraus</span></div>
+    <button class="menu-btn" onclick="openCreateLobby()">
+        <div class="menu-icon">🏠</div>
+        <div class="menu-text"><span class="menu-title">Lobby erstellen</span><span class="menu-sub">Erstelle eine Lobby mit Einladungscode</span></div>
+        <i class="fas fa-chevron-right" style="color:#ccc;"></i>
+    </button>
+    <button class="menu-btn" onclick="openJoinLobby()">
+        <div class="menu-icon">🔑</div>
+        <div class="menu-text"><span class="menu-title">Lobby beitreten</span><span class="menu-sub">Code eingeben und beitreten</span></div>
         <i class="fas fa-chevron-right" style="color:#ccc;"></i>
     </button>
     <button class="menu-btn" onclick="startMatchmaking()">
@@ -352,16 +357,54 @@
     </button>
 </div>
 
-<!-- FRIENDS GAME -->
-<div id="friendsView" class="view view-large hidden">
+<!-- LOBBY ERSTELLEN -->
+<div id="lobbyCreateView" class="view hidden">
     <div class="game-header">
-        <button onclick="showView('menuView')" class="secondary" style="padding:7px 12px;"><i class="fas fa-chevron-left"></i></button>
-        <h3>Freundes Spiel</h3>
-        <button onclick="loadFriendsList()" class="secondary" style="padding:7px 12px;" title="Aktualisieren"><i class="fas fa-sync-alt"></i></button>
+        <button onclick="leaveLobbyHost()" class="secondary" style="padding:7px 12px;"><i class="fas fa-chevron-left"></i></button>
+        <h3>Lobby erstellen</h3>
+        <div style="width:46px;"></div>
     </div>
-    <div class="info-box"><i class="fas fa-info-circle" style="color:var(--main);"></i> Der eingeladene Freund muss ebenfalls <b>John TicTacToe</b> geöffnet haben, um die Einladung zu empfangen.</div>
-    <div class="scroll-area" id="friendsGameList" style="margin-top:8px;">
-        <div class="empty-state"><i class="fas fa-spinner fa-spin"></i><br>Freunde werden geladen...</div>
+    <div style="display:flex; flex-direction:column; align-items:center; gap:18px; padding: 20px 0;">
+        <div style="font-size:3rem;">🏠</div>
+        <p style="margin:0; color:#888; font-size:0.9rem; text-align:center;">Teile diesen Code mit deinem Gegner:</p>
+        <div id="lobbyCodeDisplay" style="
+            font-size:2.5rem; font-weight:bold; letter-spacing:8px;
+            background:var(--hover); border:2px solid var(--main);
+            border-radius:16px; padding:16px 28px; color:var(--main);
+            cursor:pointer; user-select:all;
+        " onclick="copyLobbyCode()" title="Klicken zum Kopieren">----</div>
+        <p style="margin:0; font-size:0.75rem; color:#aaa;">Tippe auf den Code zum Kopieren</p>
+        <div id="lobbyWaitStatus" style="display:flex; align-items:center; gap:10px; color:#888; font-size:0.9rem;">
+            <div style="width:18px;height:18px;border-radius:50%;border:3px solid var(--brd);border-top-color:var(--main);animation:spin 1s linear infinite;flex-shrink:0;"></div>
+            Warte auf Spieler...
+        </div>
+        <div id="lobbyPlayerJoined" class="hidden" style="color:var(--success); font-weight:bold; font-size:1rem;">✅ Spieler beigetreten!</div>
+    </div>
+    <div style="margin-top:auto; display:flex; flex-direction:column; gap:8px;">
+        <button id="lobbyStartBtn" onclick="startLobbyGame()" class="green-btn hidden"><i class="fas fa-play"></i> Runde starten</button>
+        <button onclick="leaveLobbyHost()" class="danger"><i class="fas fa-times"></i> Lobby schließen</button>
+    </div>
+</div>
+
+<!-- LOBBY BEITRETEN -->
+<div id="lobbyJoinView" class="view hidden">
+    <div class="game-header">
+        <button onclick="leaveJoinLobby()" class="secondary" style="padding:7px 12px;"><i class="fas fa-chevron-left"></i></button>
+        <h3>Lobby beitreten</h3>
+        <div style="width:46px;"></div>
+    </div>
+    <div style="display:flex; flex-direction:column; align-items:center; gap:16px; padding:20px 0;">
+        <div style="font-size:3rem;">🔑</div>
+        <p style="margin:0; color:#888; font-size:0.9rem; text-align:center;">Gib den Lobby-Code ein:</p>
+        <input type="text" id="joinLobbyCodeInput" placeholder="z.B. AB12CD" maxlength="6"
+            style="text-align:center; font-size:1.6rem; letter-spacing:6px; font-weight:bold; text-transform:uppercase;"
+            oninput="this.value=this.value.toUpperCase()">
+        <button onclick="joinLobbyByCode()" style="width:100%;"><i class="fas fa-sign-in-alt"></i> Beitreten</button>
+    </div>
+    <div id="lobbyJoinWait" class="hidden" style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:10px 0;">
+        <div style="width:48px;height:48px;border-radius:50%;border:5px solid var(--brd);border-top-color:var(--main);animation:spin 1s linear infinite;"></div>
+        <p style="margin:0; color:#888; font-size:0.9rem;">Warte darauf, dass der Host das Spiel startet...</p>
+        <button onclick="leaveJoinLobby()" class="danger" style="font-size:0.85rem; padding:9px;"><i class="fas fa-times"></i> Verlassen</button>
     </div>
 </div>
 
@@ -443,18 +486,7 @@
     </div>
 </div>
 
-<!-- INVITE -->
-<div class="invite-overlay hidden" id="inviteOverlay">
-    <div class="invite-card">
-        <div style="font-size:2.5rem; margin-bottom:10px;">🎮</div>
-        <h2 style="color:var(--main); margin:0 0 8px 0;">Spieleinladung!</h2>
-        <p><b id="inviteFromName"></b> fordert dich zum Tic Tac Toe heraus!</p>
-        <div style="display:flex; flex-direction:column; gap:8px; margin-top:15px;">
-            <button onclick="acceptInvite()" class="green-btn"><i class="fas fa-check"></i> Annehmen</button>
-            <button onclick="declineInvite()" class="danger"><i class="fas fa-times"></i> Ablehnen</button>
-        </div>
-    </div>
-</div>
+
 
 <!-- REGISTER REDIRECT -->
 <div id="registerRedirectEmbed" class="hidden">
@@ -467,33 +499,7 @@
     </div>
 </div>
 
-<!-- INVITE SENT EMBED (slide from bottom) -->
-<div id="inviteSentEmbed" class="hidden" style="
-    position: fixed; bottom: -200px; left: 50%; transform: translateX(-50%);
-    width: 90%; max-width: 400px;
-    background: var(--cont); border: 2px solid var(--main);
-    border-radius: 20px; padding: 20px 22px;
-    box-shadow: 0 -8px 40px rgba(88,101,242,0.25);
-    z-index: 7000; text-align: center;
-    transition: bottom 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    display: flex; flex-direction: column; gap: 10px;
-">
-    <div style="display:flex; align-items:center; gap:12px;">
-        <div style="font-size:2rem; flex-shrink:0;">✉️</div>
-        <div style="text-align:left; flex:1;">
-            <div style="font-weight:bold; font-size:1rem; color:var(--main);">Einladung gesendet!</div>
-            <div style="font-size:0.85rem; color:#888; margin-top:2px;">Warte auf Antwort von <b id="inviteSentToName"></b>...</div>
-        </div>
-        <div class="invite-sent-spinner" style="
-            width: 22px; height: 22px; border-radius: 50%;
-            border: 3px solid var(--brd); border-top-color: var(--main);
-            animation: spin 1s linear infinite; flex-shrink:0;
-        "></div>
-    </div>
-    <button onclick="cancelPendingInvite()" class="danger" style="font-size:0.85rem; padding:9px;">
-        <i class="fas fa-times"></i> Einladung zurückziehen
-    </button>
-</div>
+
 
 <!-- MODALS -->
 <div id="logoutConfirmModal" class="modal-overlay hidden">
@@ -533,13 +539,13 @@
 
     // STATE
     let currentUser = null, currentGameId = null, mySymbol = null;
-    let gameListener = null, inviteListener = null, presenceInterval = null, queueListener = null;
+    let gameListener = null, presenceInterval = null, queueListener = null;
     let aiDifficulty = null, isAiGame = false;
     let localBoard = ['','','','','','','','',''];
     let localScores = { X: 0, O: 0 };
     let currentRound = 1, roundInProgress = false;
-    let pendingInviteId = null, pendingInviteFrom = null;
     let inQueue = false;
+    let currentLobbyCode = null, lobbyListener = null;
 
     // UTILS
     function showView(id) {
@@ -632,7 +638,6 @@
         document.getElementById('menuGreeting').innerText = 'Hi, ' + currentUser + ' 👋';
         showView('menuView');
         startPresence();
-        listenForInvites();
     }
 
     // FORGOT PASSWORD
@@ -679,215 +684,126 @@
         if (currentUser) db.ref('tictactoe/presence/' + currentUser).remove();
     }
     function cleanupOnLeave() {
-        stopPresence(); stopInviteListener(); stopGameListener(); cancelMatchmakingCleanup();
+        stopPresence(); stopGameListener(); cancelMatchmakingCleanup();
+        stopLobbyListener();
+        if (currentUser) db.ref('users/' + currentUser + '/GameSearch').remove();
     }
 
-    // ===== FRIENDS GAME — Bugfix: lädt Freunde direkt aus users/{user}/friends =====
-    function openFriendsGame() {
-        showView('friendsView');
-        loadFriendsList();
+    // ===== LOBBY =====
+    function generateLobbyCode() {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let code = '';
+        for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+        return code;
     }
 
-    function loadFriendsList() {
-        const container = document.getElementById('friendsGameList');
-        container.innerHTML = '<div class="empty-state"><i class="fas fa-spinner fa-spin"></i><br>Freunde werden geladen...</div>';
-
-        db.ref('users/' + currentUser + '/friends').once('value').then(snap => {
-            const friendsData = snap.val();
-
-            if (!friendsData || typeof friendsData !== 'object') {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-users" style="font-size:2rem; display:block; margin-bottom:10px; color:#ccc;"></i>
-                        Keine Freunde vorhanden.<br>
-                        <small>Füge auf John Chat Freunde hinzu!</small>
-                    </div>`;
-                return;
+    function openCreateLobby() {
+        currentLobbyCode = generateLobbyCode();
+        document.getElementById('lobbyCodeDisplay').innerText = currentLobbyCode;
+        document.getElementById('lobbyWaitStatus').classList.remove('hidden');
+        document.getElementById('lobbyPlayerJoined').classList.add('hidden');
+        document.getElementById('lobbyStartBtn').classList.add('hidden');
+        showView('lobbyCreateView');
+        db.ref('tictactoe/lobbies/' + currentLobbyCode).set({
+            host: currentUser, guest: null, status: 'waiting', created: Date.now()
+        });
+        lobbyListener = db.ref('tictactoe/lobbies/' + currentLobbyCode).on('value', snap => {
+            const d = snap.val();
+            if (!d) return;
+            if (d.guest && d.status === 'waiting') {
+                document.getElementById('lobbyWaitStatus').classList.add('hidden');
+                document.getElementById('lobbyPlayerJoined').classList.remove('hidden');
+                document.getElementById('lobbyPlayerJoined').innerText = '✅ ' + d.guest + ' ist beigetreten!';
+                document.getElementById('lobbyStartBtn').classList.remove('hidden');
             }
-
-            const friendKeys = Object.keys(friendsData);
-
-            if (friendKeys.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <i class="fas fa-users" style="font-size:2rem; display:block; margin-bottom:10px; color:#ccc;"></i>
-                        Keine Freunde vorhanden.<br>
-                        <small>Füge auf John Chat Freunde hinzu!</small>
-                    </div>`;
-                return;
+            if (d.status === 'starting' && d.gameId) {
+                stopLobbyListener();
+                startOnlineGame(d.gameId, 'X', d.guest);
             }
-
-            container.innerHTML = '';
-            const now = Date.now();
-
-            // Alle Presence-Abfragen parallel ausführen
-            const presencePromises = friendKeys.map(friend =>
-                db.ref('tictactoe/presence/' + friend).once('value')
-                    .then(ps => ({
-                        friend,
-                        online: ps.exists() && (now - ps.val()) < 35000
-                    }))
-                    .catch(() => ({ friend, online: false }))
-            );
-
-            Promise.all(presencePromises).then(results => {
-                // Online-Freunde zuerst sortieren
-                results.sort((a, b) => (b.online ? 1 : 0) - (a.online ? 1 : 0));
-
-                results.forEach(({ friend, online }) => {
-                    const div = document.createElement('div');
-                    div.className = 'friend-item';
-                    div.id = 'frow-' + friend;
-                    div.innerHTML = `
-                        <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
-                            <div style="width:10px; height:10px; border-radius:50%; flex-shrink:0; background:${online ? 'var(--success)' : '#bbb'};"></div>
-                            <div style="min-width:0; text-align:left;">
-                                <b style="font-size:0.95rem;">${friend}</b><br>
-                                <small style="color:${online ? 'var(--success)' : '#aaa'};">
-                                    ${online ? '✅ Auf TicTacToe online' : '⚪ Nicht auf TicTacToe'}
-                                </small>
-                            </div>
-                        </div>
-                        <button onclick="inviteFriend('${friend}')"
-                            style="padding:8px 14px; font-size:0.85rem; flex-shrink:0; margin-left:8px; ${online ? '' : 'background:#ccc;'}">
-                            <i class="fas fa-gamepad"></i> Spielen
-                        </button>`;
-                    container.appendChild(div);
-                });
-            });
-
-        }).catch(err => {
-            container.innerHTML = `<div class="empty-state" style="color:var(--danger);">⚠️ Fehler beim Laden der Freunde.<br><small>${err.message || 'Verbindungsfehler'}</small></div>`;
         });
     }
 
-    let pendingGameId = null;
-    let pendingInviteFriend = null;
-    let pendingInviteNodeId = null;
-
-    function showInviteSentEmbed(friend) {
-        document.getElementById('inviteSentToName').innerText = friend;
-        const el = document.getElementById('inviteSentEmbed');
-        el.classList.remove('hidden');
-        el.style.display = 'flex';
-        setTimeout(() => { el.style.bottom = '24px'; }, 20);
+    function copyLobbyCode() {
+        if (!currentLobbyCode) return;
+        navigator.clipboard.writeText(currentLobbyCode).then(() => triggerEmbed('Code kopiert: ' + currentLobbyCode));
     }
 
-    function hideInviteSentEmbed() {
-        const el = document.getElementById('inviteSentEmbed');
-        el.style.bottom = '-200px';
-        setTimeout(() => { el.classList.add('hidden'); el.style.display = 'none'; }, 500);
-    }
-
-    function cancelPendingInvite() {
-        hideInviteSentEmbed();
-        if (pendingGameId) {
-            db.ref('tictactoe/games/' + pendingGameId + '/status').off();
-            db.ref('tictactoe/games/' + pendingGameId).remove();
-            pendingGameId = null;
-        }
-        if (pendingInviteFriend && pendingInviteNodeId) {
-            db.ref('tictactoe/invites/' + pendingInviteFriend + '/' + pendingInviteNodeId).remove();
-        }
-        pendingInviteFriend = null;
-        pendingInviteNodeId = null;
-        triggerEmbed('Einladung zurückgezogen.', 'danger');
-    }
-
-    function inviteFriend(friend) {
-        db.ref('tictactoe/presence/' + friend).once('value', snap => {
-            const isOnline = snap.exists() && (Date.now() - snap.val()) < 35000;
-            if (!isOnline) {
-                triggerEmbed('⚠️ ' + friend + ' ist nicht auf John TicTacToe online!', 'danger');
-                return;
-            }
-
+    function startLobbyGame() {
+        if (!currentLobbyCode) return;
+        db.ref('tictactoe/lobbies/' + currentLobbyCode).once('value', snap => {
+            const d = snap.val();
+            if (!d || !d.guest) return triggerEmbed('Noch kein Spieler beigetreten!', 'danger');
             const gameId = db.ref('tictactoe/games').push().key;
-            pendingGameId = gameId;
-            pendingInviteFriend = friend;
-
             db.ref('tictactoe/games/' + gameId).set({
-                playerX: currentUser, playerO: friend,
+                playerX: currentUser, playerO: d.guest,
                 board: ['','','','','','','','',''],
-                currentTurn: 'X', status: 'waiting',
+                currentTurn: 'X', status: 'playing',
                 winnerSymbol: null, scores: { X:0, O:0 }, round: 1, created: Date.now()
             });
+            db.ref('tictactoe/lobbies/' + currentLobbyCode).update({ status: 'starting', gameId });
+        });
+    }
 
-            const invId = db.ref('tictactoe/invites/' + friend).push().key;
-            pendingInviteNodeId = invId;
-            db.ref('tictactoe/invites/' + friend + '/' + invId).set({ from: currentUser, gameId, timestamp: Date.now() });
+    function leaveLobbyHost() {
+        stopLobbyListener();
+        if (currentLobbyCode) db.ref('tictactoe/lobbies/' + currentLobbyCode).remove();
+        currentLobbyCode = null;
+        showView('menuView');
+    }
 
-            // Show the slide-up embed
-            showInviteSentEmbed(friend);
+    function openJoinLobby() {
+        document.getElementById('joinLobbyCodeInput').value = '';
+        document.getElementById('lobbyJoinWait').classList.add('hidden');
+        showView('lobbyJoinView');
+    }
 
-            db.ref('tictactoe/games/' + gameId + '/status').on('value', s => {
-                if (s.val() === 'playing') {
-                    db.ref('tictactoe/games/' + gameId + '/status').off();
-                    hideInviteSentEmbed();
-                    startOnlineGame(gameId, 'X', friend);
-                } else if (s.val() === 'declined') {
-                    db.ref('tictactoe/games/' + gameId + '/status').off();
-                    db.ref('tictactoe/games/' + gameId).remove();
-                    hideInviteSentEmbed();
-                    triggerEmbed('❌ ' + friend + ' hat die Einladung abgelehnt.', 'danger');
-                    pendingGameId = null; pendingInviteFriend = null; pendingInviteNodeId = null;
+    function joinLobbyByCode() {
+        const code = document.getElementById('joinLobbyCodeInput').value.trim().toUpperCase();
+        if (code.length < 4) return triggerEmbed('Bitte Code eingeben!', 'danger');
+        db.ref('tictactoe/lobbies/' + code).once('value', snap => {
+            const d = snap.val();
+            if (!d) return triggerEmbed('Lobby nicht gefunden!', 'danger');
+            if (d.status !== 'waiting') return triggerEmbed('Lobby bereits gestartet!', 'danger');
+            if (d.guest) return triggerEmbed('Lobby ist bereits voll!', 'danger');
+            if (d.host === currentUser) return triggerEmbed('Das ist deine eigene Lobby!', 'danger');
+            currentLobbyCode = code;
+            db.ref('tictactoe/lobbies/' + code).update({ guest: currentUser });
+            document.getElementById('lobbyJoinWait').classList.remove('hidden');
+            lobbyListener = db.ref('tictactoe/lobbies/' + code).on('value', snap2 => {
+                const d2 = snap2.val();
+                if (!d2) { leaveJoinLobby(); triggerEmbed('Lobby wurde geschlossen.', 'danger'); return; }
+                if (d2.status === 'starting' && d2.gameId) {
+                    stopLobbyListener();
+                    startOnlineGame(d2.gameId, 'O', d2.host);
                 }
             });
         });
     }
 
-    // INVITE LISTENER
-    function listenForInvites() {
-        stopInviteListener();
-        inviteListener = db.ref('tictactoe/invites/' + currentUser).on('value', snap => {
-            if (!snap.exists()) { document.getElementById('inviteOverlay').classList.add('hidden'); return; }
-            const invites = snap.val();
-            const ids = Object.keys(invites);
-            if (ids.length === 0) return;
-            const id = ids[0];
-            const invite = invites[id];
-            if (Date.now() - (invite.timestamp || 0) > 60000) {
-                db.ref('tictactoe/invites/' + currentUser + '/' + id).remove(); return;
-            }
-            pendingInviteId = id;
-            pendingInviteFrom = invite.from;
-            document.getElementById('inviteFromName').innerText = invite.from;
-            document.getElementById('inviteOverlay').classList.remove('hidden');
-        });
-    }
-    function stopInviteListener() {
-        if (inviteListener && currentUser) {
-            db.ref('tictactoe/invites/' + currentUser).off('value', inviteListener);
-            inviteListener = null;
+    function leaveJoinLobby() {
+        stopLobbyListener();
+        if (currentLobbyCode) {
+            db.ref('tictactoe/lobbies/' + currentLobbyCode + '/guest').remove();
+            currentLobbyCode = null;
         }
+        showView('menuView');
     }
-    function acceptInvite() {
-        document.getElementById('inviteOverlay').classList.add('hidden');
-        if (!pendingInviteId) return;
-        db.ref('tictactoe/invites/' + currentUser + '/' + pendingInviteId).once('value', snap => {
-            const invite = snap.val();
-            if (!invite) return;
-            db.ref('tictactoe/invites/' + currentUser + '/' + pendingInviteId).remove();
-            db.ref('tictactoe/games/' + invite.gameId + '/status').set('playing');
-            startOnlineGame(invite.gameId, 'O', invite.from);
-        });
-    }
-    function declineInvite() {
-        document.getElementById('inviteOverlay').classList.add('hidden');
-        if (!pendingInviteId) return;
-        db.ref('tictactoe/invites/' + currentUser + '/' + pendingInviteId).once('value', snap => {
-            const invite = snap.val();
-            if (invite) db.ref('tictactoe/games/' + invite.gameId + '/status').set('declined');
-            db.ref('tictactoe/invites/' + currentUser + '/' + pendingInviteId).remove();
-        });
-        pendingInviteId = pendingInviteFrom = null;
+
+    function stopLobbyListener() {
+        if (lobbyListener && currentLobbyCode) {
+            db.ref('tictactoe/lobbies/' + currentLobbyCode).off('value', lobbyListener);
+            lobbyListener = null;
+        }
     }
 
     // MATCHMAKING
     function startMatchmaking() {
         showView('matchmakingView');
         inQueue = true;
-        db.ref('tictactoe/queue/' + currentUser).set({ timestamp: Date.now(), user: currentUser });
+        const timestamp = Date.now();
+        db.ref('users/' + currentUser + '/GameSearch').set(true);
+        db.ref('tictactoe/queue/' + currentUser).set({ timestamp, user: currentUser });
+
         queueListener = db.ref('tictactoe/queue').on('value', snap => {
             if (!inQueue || !snap.exists()) return;
             const queue = snap.val();
@@ -923,7 +839,10 @@
     function cancelMatchmakingCleanup() {
         inQueue = false;
         if (queueListener) { db.ref('tictactoe/queue').off('value', queueListener); queueListener = null; }
-        if (currentUser) db.ref('tictactoe/queue/' + currentUser).remove();
+        if (currentUser) {
+            db.ref('tictactoe/queue/' + currentUser).remove();
+            db.ref('users/' + currentUser + '/GameSearch').remove();
+        }
     }
     function cancelMatchmaking() { cancelMatchmakingCleanup(); showView('menuView'); }
 
@@ -1166,6 +1085,8 @@
     function backToMenu() {
         document.getElementById('matchWonOverlay').classList.add('hidden');
         stopGameListener(); currentGameId = null; mySymbol = null; roundInProgress = false;
+        stopLobbyListener();
+        if (currentLobbyCode) { db.ref('tictactoe/lobbies/' + currentLobbyCode).remove(); currentLobbyCode = null; }
         showView('menuView');
     }
 
