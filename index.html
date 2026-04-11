@@ -285,6 +285,27 @@
             font-weight: bold; background: rgba(88,101,242,0.15); color: var(--main);
             border: 1px solid rgba(88,101,242,0.3); white-space: nowrap;
         }
+
+        /* === FULLSCREEN IMAGE OVERLAY === */
+        #fullscreenImageOverlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.92); z-index: 99999;
+            align-items: center; justify-content: center; cursor: zoom-out;
+        }
+        #fullscreenImageOverlay.active { display: flex; }
+        #fullscreenImageOverlay img {
+            max-width: 95vw; max-height: 90vh; object-fit: contain;
+            border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            cursor: default;
+        }
+        #fullscreenCloseBtn {
+            position: absolute; top: 18px; right: 20px;
+            background: rgba(255,255,255,0.15); border: none; color: white;
+            width: 38px; height: 38px; border-radius: 50%; font-size: 1.1rem;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: 0.2s;
+        }
+        #fullscreenCloseBtn:hover { background: rgba(255,255,255,0.3); }
     </style>
 </head>
 <body>
@@ -1554,6 +1575,30 @@
 
     // Set aiModeLabel on entering aiSelectView if needed
     document.getElementById('aiModeLabel').innerText = '';
+
+    // === FULLSCREEN IMAGE ===
+    function openFullscreenImage(src) {
+        const overlay = document.getElementById('fullscreenImageOverlay');
+        const img = document.getElementById('fullscreenImageEl');
+        img.src = src;
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeFullscreenImage() {
+        document.getElementById('fullscreenImageOverlay').classList.remove('active');
+        document.getElementById('fullscreenImageEl').src = '';
+        document.body.style.overflow = '';
+    }
+    document.addEventListener('keydown', function(e) {
+        if(e.key === 'Escape') closeFullscreenImage();
+    });
 </script>
+
+<!-- FULLSCREEN IMAGE OVERLAY -->
+<div id="fullscreenImageOverlay" onclick="closeFullscreenImage()">
+    <button id="fullscreenCloseBtn" onclick="closeFullscreenImage()"><i class="fas fa-times"></i></button>
+    <img id="fullscreenImageEl" src="" onclick="event.stopPropagation()">
+</div>
+
 </body>
 </html>
